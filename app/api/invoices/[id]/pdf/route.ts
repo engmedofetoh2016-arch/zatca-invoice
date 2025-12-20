@@ -129,12 +129,19 @@ export async function GET(
 
     const pdfBytes = await pdfDoc.save()
 
-    return new Response(pdfBytes, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${inv.invoice_number}.pdf"`,
-      },
-    })
+// Convert Uint8Array -> ArrayBuffer (TS-safe for BodyInit)
+const body = pdfBytes.buffer.slice(
+  pdfBytes.byteOffset,
+  pdfBytes.byteOffset + pdfBytes.byteLength
+)
+
+return new Response(body, {
+  headers: {
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `inline; filename="${inv.invoice_number}.pdf"`,
+  },
+})
+
   } catch (err) {
     console.error("PDF ERROR:", err)
     return NextResponse.json({ error: "PDF generation failed" }, { status: 500 })
