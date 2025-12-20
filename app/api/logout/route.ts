@@ -1,3 +1,4 @@
+// app/api/auth/logout/route.ts
 export async function POST() {
   return new Response(JSON.stringify({ ok: true }), {
     headers: {

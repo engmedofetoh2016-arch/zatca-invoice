@@ -45,7 +45,7 @@ export default function NewInvoicePage() {
 
     if (!res.ok) return alert(await res.text())
     const data = await res.json()
-    router.push(`/invoices/${data.invoiceId}`)
+    router.push(`/dashboard/invoices/${data.invoiceId}`)
   }
 
   return (
