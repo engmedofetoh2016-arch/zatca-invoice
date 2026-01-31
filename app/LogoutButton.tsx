@@ -1,13 +1,17 @@
-"use client"
+﻿"use client"
 
 import { useRouter } from "next/navigation"
+import { getCsrfToken } from "@/lib/csrf-client"
 
 export default function LogoutButton() {
   const router = useRouter()
 
   async function logout() {
-    await fetch("/api/logout", { method: "POST" })
-    router.replace("/") // go to public home
+    await fetch("/api/logout", {
+      method: "POST",
+      headers: { "x-csrf-token": getCsrfToken() },
+    })
+    router.replace("/")
   }
 
   return (

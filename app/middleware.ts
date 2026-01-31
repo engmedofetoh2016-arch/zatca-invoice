@@ -4,24 +4,57 @@ import type { NextRequest } from "next/server"
 
 export function middleware(req: NextRequest) {
   const token = req.cookies.get("token")?.value
+  const csrf = req.cookies.get("csrf")?.value
+  const isProd = process.env.NODE_ENV === "production"
 
-  // If user hits "/" and is logged in → go to dashboard
   if (req.nextUrl.pathname === "/" && token) {
     const url = req.nextUrl.clone()
     url.pathname = "/dashboard"
-    return NextResponse.redirect(url)
+    const res = NextResponse.redirect(url)
+    if (!csrf) {
+      res.cookies.set({
+        name: "csrf",
+        value: crypto.randomUUID(),
+        httpOnly: false,
+        sameSite: "lax",
+        secure: isProd,
+        path: "/",
+      })
+    }
+    return res
   }
 
-  // Protect /dashboard routes (optional)
   if (req.nextUrl.pathname.startsWith("/dashboard") && !token) {
     const url = req.nextUrl.clone()
     url.pathname = "/login"
-    return NextResponse.redirect(url)
+    const res = NextResponse.redirect(url)
+    if (!csrf) {
+      res.cookies.set({
+        name: "csrf",
+        value: crypto.randomUUID(),
+        httpOnly: false,
+        sameSite: "lax",
+        secure: isProd,
+        path: "/",
+      })
+    }
+    return res
   }
 
-  return NextResponse.next()
+  const res = NextResponse.next()
+  if (!csrf) {
+    res.cookies.set({
+      name: "csrf",
+      value: crypto.randomUUID(),
+      httpOnly: false,
+      sameSite: "lax",
+      secure: isProd,
+      path: "/",
+    })
+  }
+  return res
 }
 
 export const config = {
-  matcher: ["/", "/dashboard/:path*"],
+  matcher: ["/", "/dashboard/:path*", "/login", "/signup"],
 }

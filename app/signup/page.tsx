@@ -1,6 +1,7 @@
-"use client"
+﻿"use client"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { getCsrfToken } from "@/lib/csrf-client"
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
@@ -10,7 +11,10 @@ export default function SignupPage() {
   async function submit() {
     const res = await fetch("/api/signup", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": getCsrfToken(),
+      },
       body: JSON.stringify({ email, password }),
     })
     if (!res.ok) return alert(await res.text())

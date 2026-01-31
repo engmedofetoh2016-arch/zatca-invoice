@@ -1,6 +1,8 @@
 import { pool } from "@/lib/db"
 import { cookies } from "next/headers"
 import { verifyToken } from "@/lib/auth"
+import { rateLimit } from "@/lib/rate-limit"
+import { getClientIp, requireCsrf } from "@/lib/security"
 
 export async function POST(req: Request) {
   const cookieStore = await cookies()
@@ -9,7 +11,20 @@ export async function POST(req: Request) {
   const user = token ? verifyToken(token) : null
   if (!user) return new Response("Unauthorized", { status: 401 })
 
+  const ip = getClientIp(req)
+  const rl = rateLimit(`business:update:${ip}`, 20, 60_000)
+  if (!rl.ok) {
+    return new Response("Too many requests", {
+      status: 429,
+      headers: { "Retry-After": String(rl.retryAfter) },
+    })
+  }
+
   const form = await req.formData()
+  const csrfToken = String(form.get("csrf") ?? "")
+  if (!requireCsrf(req, csrfToken)) {
+    return new Response("CSRF validation failed", { status: 403 })
+  }
   const name = form.get("name")
   const vat = form.get("vat")
   const cr = form.get("cr")
@@ -30,6 +45,20 @@ export async function POST(req: Request) {
     `,
     [user.userId, name, vat, cr]
   )
+
+  const bizRes = await pool.query(
+    `SELECT id FROM businesses WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    [user.userId]
+  )
+  const businessId = bizRes.rows[0]?.id
+  if (businessId) {
+    await pool.query(
+      `INSERT INTO business_memberships (business_id, user_id, role)
+       VALUES ($1,$2,'owner')
+       ON CONFLICT (business_id, user_id) DO NOTHING`,
+      [businessId, user.userId]
+    )
+  }
 
   return new Response(null, {
   status: 302,

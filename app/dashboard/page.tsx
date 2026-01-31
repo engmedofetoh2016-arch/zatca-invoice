@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic"
+﻿export const dynamic = "force-dynamic"
 
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
@@ -14,6 +14,7 @@ export default async function DashboardPage({
 
   const cookieStore = await cookies()
   const token = cookieStore.get("token")?.value
+  const csrf = cookieStore.get("csrf")?.value ?? ""
   const user = token ? verifyToken(token) : null
   if (!user) redirect("/login")
 
@@ -30,6 +31,7 @@ export default async function DashboardPage({
       )}
 
       <form action="/api/business" method="post" className="space-y-3">
+        <input type="hidden" name="csrf" value={csrf} />
         <input
           name="name"
           className="border p-2 w-full"

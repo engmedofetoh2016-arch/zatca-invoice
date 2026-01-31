@@ -1,4 +1,4 @@
-// app/page.tsx
+﻿// app/page.tsx
 import Link from "next/link"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
@@ -9,10 +9,8 @@ export default async function HomePage() {
   const token = cookieStore.get("token")?.value
   const user = token ? verifyToken(token) : null
 
-  // If logged in → dashboard
   if (user) redirect("/dashboard")
 
-  // If logged out → show login/signup
   return (
     <main className="mx-auto max-w-md p-8 space-y-4 text-center">
       <h1 className="text-2xl font-semibold">مرحباً بك</h1>

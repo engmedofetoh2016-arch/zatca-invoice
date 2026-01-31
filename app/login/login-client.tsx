@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState } from "react"
+import { getCsrfToken } from "@/lib/csrf-client"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -18,7 +19,10 @@ export default function LoginPage() {
 
     const res = await fetch("/api/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": getCsrfToken(),
+      },
       body: JSON.stringify({ email, password }),
     })
 

@@ -1,0 +1,21 @@
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS failed_login_attempts INT NOT NULL DEFAULT 0;
+
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ NULL;
+
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS password_updated_at TIMESTAMPTZ NULL;
+
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ NULL;
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  jti TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  revoked_at TIMESTAMPTZ NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_jti ON user_sessions(user_id, jti);

@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic"
+﻿export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
 import Link from "next/link"
@@ -7,12 +7,69 @@ import { cookies } from "next/headers"
 import { verifyToken } from "@/lib/auth"
 import { getBusinessByUserId } from "@/lib/business"
 import { pool } from "@/lib/db"
+import InvoiceImportExport from "./InvoiceImportExport"
 
 function formatSar(amount: number) {
   return new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR" }).format(amount)
 }
 function formatDate(d: string) {
   return new Intl.DateTimeFormat("ar-SA", { dateStyle: "medium" }).format(new Date(d))
+}
+
+function statusLabel(status: string) {
+  switch (status) {
+    case "draft":
+      return "مسودة"
+    case "issued":
+      return "صادرة"
+    case "reported":
+      return "مبلّغ عنها"
+    case "cleared":
+      return "مصفّاة"
+    case "rejected":
+      return "مرفوضة"
+    default:
+      return status
+  }
+}
+
+function statusClass(status: string) {
+  switch (status) {
+    case "draft":
+      return "bg-gray-100 text-gray-700"
+    case "issued":
+      return "bg-blue-100 text-blue-700"
+    case "reported":
+      return "bg-yellow-100 text-yellow-700"
+    case "cleared":
+      return "bg-green-100 text-green-700"
+    case "rejected":
+      return "bg-red-100 text-red-700"
+    default:
+      return "bg-gray-100 text-gray-700"
+  }
+}
+
+function typeLabel(type: string) {
+  switch (type) {
+    case "credit":
+      return "إشعار دائن"
+    case "debit":
+      return "إشعار مدين"
+    default:
+      return "فاتورة"
+  }
+}
+
+function typeClass(type: string) {
+  switch (type) {
+    case "credit":
+      return "bg-purple-100 text-purple-700"
+    case "debit":
+      return "bg-orange-100 text-orange-700"
+    default:
+      return "bg-slate-100 text-slate-700"
+  }
 }
 
 export default async function InvoicesPage() {
@@ -25,29 +82,32 @@ export default async function InvoicesPage() {
   if (!business) return <div className="p-6">No business found for this user.</div>
 
   const res = await pool.query(
-    `SELECT id, invoice_number, issue_date, total
+    `SELECT id, invoice_number, issue_date, total, status, invoice_type
      FROM invoices
      WHERE business_id = $1
      ORDER BY created_at DESC`,
     [business.id]
   )
 
-  const invoices = res.rows as Array<{ id: string; invoice_number: string; issue_date: string; total: number }>
+  const invoices = res.rows as Array<{ id: string; invoice_number: string; issue_date: string; total: number; status: string; invoice_type: string }>
 
   return (
     <div dir="rtl" className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">الفواتير</h1>
           <p className="mt-1 text-sm text-gray-600">هذه الفواتير خاصة بمنشأتك فقط.</p>
         </div>
 
-        <Link
-          href="/dashboard/invoices/new"
-          className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          + فاتورة جديدة
-        </Link>
+        <div className="flex flex-col gap-2 items-start sm:items-end">
+          <Link
+            href="/dashboard/invoices/new"
+            className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          >
+            + فاتورة جديدة
+          </Link>
+          <InvoiceImportExport />
+        </div>
       </div>
 
       {invoices.length === 0 ? (
@@ -56,7 +116,17 @@ export default async function InvoicesPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {invoices.map((inv) => (
             <div key={inv.id} className="rounded-xl border bg-white p-4 shadow-sm">
-              <div className="text-sm text-gray-500">رقم الفاتورة</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-500">رقم الفاتورة</div>
+                <div className="flex items-center gap-2">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeClass(inv.invoice_type)}`}>
+                    {typeLabel(inv.invoice_type)}
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusClass(inv.status)}`}>
+                    {statusLabel(inv.status)}
+                  </span>
+                </div>
+              </div>
               <div className="text-lg font-semibold">{inv.invoice_number}</div>
 
               <div className="mt-3 flex items-center justify-between text-sm">
@@ -71,14 +141,14 @@ export default async function InvoicesPage() {
 
               <div className="mt-4 flex gap-2">
                 <Link
-                  href={`/dashboard/invoices/${inv.id}`} // ✅ UUID in URL
+                  href={`/dashboard/invoices/${inv.id}`}
                   className="flex-1 rounded-lg border px-3 py-2 text-center text-xs font-medium hover:bg-gray-50"
                 >
                   عرض التفاصيل
                 </Link>
 
                 <a
-                  href={`/api/invoices/${inv.id}/pdf`} // ✅ No DB column needed
+                  href={`/api/invoices/${inv.id}/pdf`}
                   target="_blank"
                   rel="noreferrer"
                   className="rounded-lg border px-3 py-2 text-xs font-medium hover:bg-gray-50"

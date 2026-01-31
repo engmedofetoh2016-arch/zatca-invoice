@@ -1,0 +1,8 @@
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS invoice_type TEXT NOT NULL DEFAULT 'invoice';
+
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS original_invoice_id UUID NULL;
+
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS note_reason TEXT NULL;
