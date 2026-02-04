@@ -60,7 +60,7 @@ export default function InvoiceStatusActions({ invoiceId, status }: Props) {
         <button
           key={a.status}
           onClick={() => update(a.status)}
-          className="rounded-lg border px-3 py-2 text-xs font-medium hover:bg-gray-50"
+          className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-gray-50"
           disabled={loading}
         >
           {a.label}

@@ -13,8 +13,7 @@ export function validateInvoiceInput(body: {
   const allowEmptyItems = options?.allowEmptyItems ?? false
 
   const invoiceNumber = String(body.invoiceNumber ?? "").trim()
-  if (!invoiceNumber) errors.push("invoiceNumber is required")
-  if (invoiceNumber.length > 50) errors.push("invoiceNumber is too long")
+  if (invoiceNumber && invoiceNumber.length > 50) errors.push("invoiceNumber is too long")
 
   const customerNameRaw = body.customerName ?? null
   const customerName = customerNameRaw ? String(customerNameRaw).trim() : null
@@ -22,7 +21,7 @@ export function validateInvoiceInput(body: {
 
   const customerVatRaw = body.customerVat ?? null
   const customerVat = customerVatRaw ? String(customerVatRaw).trim() : null
-  if (customerVat && !/^\d{15}$/.test(customerVat)) errors.push("customerVat must be 15 digits")
+  // Allow any customer VAT value; validation removed per request
 
   const itemsInput = Array.isArray(body.items) ? (body.items as ItemInput[]) : []
   if (!allowEmptyItems && itemsInput.length === 0) errors.push("items is required")

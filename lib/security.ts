@@ -1,18 +1,20 @@
-import { cookies } from "next/headers"
+import { cookies } from "next/headers";
 
 export function getClientIp(req: Request) {
-  const xff = req.headers.get("x-forwarded-for")
-  if (xff) return xff.split(",")[0].trim()
-  return req.headers.get("x-real-ip") ?? "unknown"
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0].trim();
+  return req.headers.get("x-real-ip") ?? "unknown";
 }
 
-export function csrfCookieValue() {
-  return cookies().get("csrf")?.value ?? null
+// ✅ Next 16: cookies() is async
+export async function csrfCookieValue() {
+  const cookieStore = await cookies();
+  return cookieStore.get("csrf")?.value ?? null;
 }
 
-export function requireCsrf(req: Request, formToken?: string | null) {
-  const cookieToken = csrfCookieValue()
-  const headerToken = req.headers.get("x-csrf-token")
-  const token = headerToken ?? formToken
-  return Boolean(token && cookieToken && token === cookieToken)
+export async function requireCsrf(req: Request) {
+  const cookieStore = await cookies();
+  const csrfCookie = cookieStore.get("csrf")?.value ?? "";
+  const csrfHeader = req.headers.get("x-csrf-token") ?? "";
+  return csrfCookie !== "" && csrfCookie === csrfHeader;
 }

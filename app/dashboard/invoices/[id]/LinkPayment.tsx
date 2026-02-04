@@ -30,16 +30,16 @@ export default function LinkPayment({ invoiceId, currentLink }: Props) {
   }
 
   return (
-    <div className="rounded-xl border bg-white p-4 text-sm space-y-2">
+    <div className="rounded-2xl border bg-white p-5 text-sm space-y-2 shadow-sm">
       <div className="font-semibold">رابط الدفع</div>
       <div className="flex gap-2">
         <input
-          className="border p-2 w-full"
+          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
           value={link}
           onChange={(e) => setLink(e.target.value)}
           placeholder="https://"
         />
-        <button className="border px-3" onClick={save} disabled={loading}>
+        <button className="rounded-lg border px-3 text-xs font-semibold hover:bg-gray-50" onClick={save} disabled={loading}>
           حفظ
         </button>
       </div>

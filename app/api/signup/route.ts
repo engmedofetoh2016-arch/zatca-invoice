@@ -5,7 +5,7 @@ import { getClientIp, requireCsrf } from "@/lib/security"
 
 export async function POST(req: Request) {
   try {
-    if (!requireCsrf(req)) {
+    if (!(await requireCsrf(req))) {
       return new Response("CSRF validation failed", { status: 403 })
     }
 

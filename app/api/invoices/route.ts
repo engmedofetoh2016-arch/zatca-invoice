@@ -41,9 +41,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Validation failed", details: validated.errors }, { status: 400 })
   }
 
-  const invoiceNumber = validated.invoiceNumber
-  const customerName = validated.customerName
-  const customerVat = validated.customerVat
+  let invoiceNumber = ""
+  let customerName = validated.customerName
+  let customerVat = validated.customerVat
+  const customerId = body?.customerId ? String(body.customerId).trim() : null
   const items: Item[] = validated.items
   const invoiceType = validated.invoiceType === "credit" || validated.invoiceType === "debit" ? validated.invoiceType : "invoice"
   const originalInvoiceId = validated.originalInvoiceId
@@ -77,6 +78,34 @@ export async function POST(req: Request) {
     )
     const icv = (icvRes.rows[0]?.count ?? 0) + 1
 
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+      `invoice-number-${businessId}`,
+    ])
+    const nextRes = await client.query(
+      `SELECT COALESCE(
+         MAX(NULLIF(regexp_replace(invoice_number, '[^0-9]', '', 'g'), '')::int),
+         0
+       ) + 1 AS next
+       FROM invoices
+       WHERE business_id = $1`,
+      [businessId]
+    )
+    const next = Number(nextRes.rows[0]?.next ?? 1)
+    invoiceNumber = `INV-${String(next).padStart(4, "0")}`
+
+    if (customerId) {
+      const cRes = await client.query(
+        `SELECT name, vat_number FROM customers WHERE id = $1 AND business_id = $2`,
+        [customerId, businessId]
+      )
+      if (!cRes.rows[0]) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Customer not found" }, { status: 400 })
+      }
+      customerName = cRes.rows[0].name
+      customerVat = cRes.rows[0].vat_number
+    }
+
     const ubl = buildUblInvoice({
       invoiceNumber,
       issueDate: new Date().toISOString().slice(0, 10),
@@ -99,10 +128,10 @@ export async function POST(req: Request) {
     const invoiceHash = hashInvoiceXml(ubl.xml)
 
     const invRes = await client.query(
-      `INSERT INTO invoices (business_id, invoice_number, customer_name, customer_vat, subtotal, vat_amount, total, status, status_changed_at, invoice_type, original_invoice_id, note_reason)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),$9,$10,$11)
+      `INSERT INTO invoices (business_id, customer_id, invoice_number, customer_name, customer_vat, subtotal, vat_amount, total, status, status_changed_at, invoice_type, original_invoice_id, note_reason)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),$10,$11,$12)
        RETURNING id`,
-      [businessId, invoiceNumber, customerName, customerVat, signedSubtotal, signedVatAmount, signedTotal, status, invoiceType, originalInvoiceId, noteReason]
+      [businessId, customerId, invoiceNumber, customerName, customerVat, signedSubtotal, signedVatAmount, signedTotal, status, invoiceType, originalInvoiceId, noteReason]
     )
 
     const invoiceId = invRes.rows[0].id as string
@@ -130,12 +159,12 @@ export async function POST(req: Request) {
         )
       }
 
-    if (status === "issued") {
-      await enqueueZatcaJob({ businessId, invoiceId, jobType: "report" })
-    }
     await auditLog({ businessId, userId: user.userId, action: "invoice.created", entityType: "invoice", entityId: invoiceId })
 
     await client.query("COMMIT")
+    if (status === "issued") {
+      await enqueueZatcaJob({ businessId, invoiceId, jobType: "report" })
+    }
     return NextResponse.json({ ok: true, invoiceId })
   } catch (e) {
     await client.query("ROLLBACK")

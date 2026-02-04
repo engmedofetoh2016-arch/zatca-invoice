@@ -72,7 +72,12 @@ function typeClass(type: string) {
   }
 }
 
-export default async function InvoicesPage() {
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; date?: string; type?: string; from?: string; to?: string; page?: string }>
+}) {
+  const sp = await searchParams
   const cookieStore = await cookies()
   const token = cookieStore.get("token")?.value
   const user = token ? verifyToken(token) : null
@@ -81,28 +86,86 @@ export default async function InvoicesPage() {
   const business = await getBusinessByUserId(user.userId)
   if (!business) return <div className="p-6">No business found for this user.</div>
 
-  const res = await pool.query(
-    `SELECT id, invoice_number, issue_date, total, status, invoice_type
+  const status = sp.status ?? "all"
+  const type = sp.type ?? "all"
+  const date = sp.date ?? "all"
+  const from = sp.from ?? ""
+  const to = sp.to ?? ""
+  const page = Math.max(1, Number(sp.page ?? 1) || 1)
+  const pageSize = 12
+
+  const conditions: string[] = ["business_id = $1"]
+  const values: Array<string | number | Date> = [business.id]
+
+  if (status !== "all") {
+    values.push(status)
+    conditions.push(`status = $${values.length}`)
+  }
+
+  if (type !== "all") {
+    values.push(type)
+    conditions.push(`invoice_type = $${values.length}`)
+  }
+
+  const now = new Date()
+  if (date === "month") {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1)
+    values.push(start)
+    conditions.push(`issue_date >= $${values.length}`)
+  } else if (date === "last7") {
+    const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    values.push(start)
+    conditions.push(`issue_date >= $${values.length}`)
+  } else if (date === "custom") {
+    if (from) {
+      values.push(new Date(from))
+      conditions.push(`issue_date >= $${values.length}`)
+    }
+    if (to) {
+      values.push(new Date(to))
+      conditions.push(`issue_date <= $${values.length}`)
+    }
+  }
+
+  const whereSql = conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""
+
+  const countRes = await pool.query(
+    `SELECT COUNT(*)::int AS count
      FROM invoices
-     WHERE business_id = $1
-     ORDER BY created_at DESC`,
-    [business.id]
+     ${whereSql}`,
+    values
+  )
+  const totalCount = Number(countRes.rows[0]?.count ?? 0)
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+  const safePage = Math.min(page, totalPages)
+  const pageWindow = 5
+  const startPage = Math.max(1, safePage - Math.floor(pageWindow / 2))
+  const endPage = Math.min(totalPages, startPage + pageWindow - 1)
+
+  const res = await pool.query(
+    `SELECT id, invoice_number, issue_date, total, status, invoice_type, customer_name
+     FROM invoices
+     ${whereSql}
+     ORDER BY created_at DESC
+     LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+    [...values, pageSize, (safePage - 1) * pageSize]
   )
 
-  const invoices = res.rows as Array<{ id: string; invoice_number: string; issue_date: string; total: number; status: string; invoice_type: string }>
+  const invoices = res.rows as Array<{ id: string; invoice_number: string; issue_date: string; total: number; status: string; invoice_type: string; customer_name?: string }>
 
   return (
     <div dir="rtl" className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">الفواتير</h1>
+          <div className="text-xs text-gray-500">إدارة الفواتير</div>
+          <h1 className="mt-2 text-2xl font-semibold text-gray-900">الفواتير</h1>
           <p className="mt-1 text-sm text-gray-600">هذه الفواتير خاصة بمنشأتك فقط.</p>
         </div>
 
-        <div className="flex flex-col gap-2 items-start sm:items-end">
+        <div className="flex flex-col gap-3 items-start sm:items-end">
           <Link
             href="/dashboard/invoices/new"
-            className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
           >
             + فاتورة جديدة
           </Link>
@@ -110,55 +173,143 @@ export default async function InvoicesPage() {
         </div>
       </div>
 
+      <form className="rounded-2xl border bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
+          <div className="flex items-center gap-2">
+            <span>الحالة:</span>
+            <select name="status" defaultValue={status} className="rounded-lg border border-gray-200 bg-white px-2 py-1">
+              <option value="all">الكل</option>
+              <option value="issued">صادرة</option>
+              <option value="reported">مبلّغ عنها</option>
+              <option value="cleared">مصفّاة</option>
+              <option value="rejected">مرفوضة</option>
+              <option value="draft">مسودة</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span>التاريخ:</span>
+            <select name="date" defaultValue={date} className="rounded-lg border border-gray-200 bg-white px-2 py-1">
+              <option value="all">الكل</option>
+              <option value="month">هذا الشهر</option>
+              <option value="last7">آخر 7 أيام</option>
+              <option value="custom">مخصص</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span>النوع:</span>
+            <select name="type" defaultValue={type} className="rounded-lg border border-gray-200 bg-white px-2 py-1">
+              <option value="all">الكل</option>
+              <option value="invoice">ضريبية</option>
+              <option value="credit">إشعار دائن</option>
+              <option value="debit">إشعار مدين</option>
+            </select>
+          </div>
+
+          {date === "custom" && (
+            <div className="flex items-center gap-2">
+              <input name="from" defaultValue={from} type="date" className="rounded-lg border border-gray-200 bg-white px-2 py-1" />
+              <span>—</span>
+              <input name="to" defaultValue={to} type="date" className="rounded-lg border border-gray-200 bg-white px-2 py-1" />
+            </div>
+          )}
+
+          <button className="rounded-lg bg-black px-3 py-1 text-xs font-semibold text-white hover:opacity-90">
+            تطبيق الفلاتر
+          </button>
+        </div>
+      </form>
+
       {invoices.length === 0 ? (
-        <div className="rounded-xl border bg-white p-8 text-center text-gray-600">لا توجد فواتير حالياً.</div>
+        <div className="rounded-2xl border bg-white p-10 text-center text-gray-600">
+          لا توجد فواتير حالياً.
+        </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {invoices.map((inv) => (
-            <div key={inv.id} className="rounded-xl border bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-500">رقم الفاتورة</div>
-                <div className="flex items-center gap-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeClass(inv.invoice_type)}`}>
-                    {typeLabel(inv.invoice_type)}
-                  </span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusClass(inv.status)}`}>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {invoices.map((inv) => (
+              <div key={inv.id} className="relative rounded-2xl border bg-white p-5 shadow-sm">
+                <div className="absolute left-5 top-4">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(inv.status)}`}>
                     {statusLabel(inv.status)}
                   </span>
                 </div>
-              </div>
-              <div className="text-lg font-semibold">{inv.invoice_number}</div>
 
-              <div className="mt-3 flex items-center justify-between text-sm">
-                <span className="text-gray-500">التاريخ</span>
-                <span className="font-medium text-gray-900">{formatDate(inv.issue_date)}</span>
-              </div>
+                <div className="mt-6 text-xs text-gray-500">رقم الفاتورة</div>
+                <div className="mt-1 text-xl font-semibold">{inv.invoice_number}</div>
 
-              <div className="mt-2 flex items-center justify-between text-sm">
-                <span className="text-gray-500">الإجمالي</span>
-                <span className="font-semibold text-gray-900">{formatSar(inv.total)}</span>
-              </div>
+                {inv.customer_name && (
+                  <div className="mt-2 text-sm text-gray-600">العميل: <span className="font-semibold text-gray-800">{inv.customer_name}</span></div>
+                )}
 
-              <div className="mt-4 flex gap-2">
-                <Link
-                  href={`/dashboard/invoices/${inv.id}`}
-                  className="flex-1 rounded-lg border px-3 py-2 text-center text-xs font-medium hover:bg-gray-50"
-                >
-                  عرض التفاصيل
-                </Link>
+                <div className="mt-4 grid gap-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500">التاريخ</span>
+                    <span className="font-medium text-gray-900">{formatDate(inv.issue_date)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500">الإجمالي</span>
+                    <span className="font-semibold text-gray-900">{formatSar(inv.total)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500">النوع</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${typeClass(inv.invoice_type)}`}>
+                      {typeLabel(inv.invoice_type)}
+                    </span>
+                  </div>
+                </div>
 
-                <a
-                  href={`/api/invoices/${inv.id}/pdf`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-lg border px-3 py-2 text-xs font-medium hover:bg-gray-50"
-                >
-                  PDF
-                </a>
+                <div className="mt-5 flex gap-2">
+                  <Link
+                    href={`/dashboard/invoices/${inv.id}`}
+                    className="flex-1 rounded-lg border px-3 py-2 text-center text-xs font-semibold hover:bg-gray-50"
+                  >
+                    عرض التفاصيل
+                  </Link>
+
+                  <a
+                    href={`/api/invoices/${inv.id}/pdf`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-gray-50"
+                  >
+                    PDF
+                  </a>
+                </div>
               </div>
+            ))}
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600">
+            <div>
+              الصفحة {safePage} من {totalPages} — إجمالي {totalCount}
             </div>
-          ))}
-        </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/dashboard/invoices?status=${status}&date=${date}&type=${type}&from=${from}&to=${to}&page=${Math.max(1, safePage - 1)}`}
+                className={`rounded-lg border px-3 py-2 text-xs font-semibold ${safePage === 1 ? "pointer-events-none opacity-50" : "hover:bg-gray-50"}`}
+              >
+                السابق
+              </Link>
+              {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map((p) => (
+                <Link
+                  key={p}
+                  href={`/dashboard/invoices?status=${status}&date=${date}&type=${type}&from=${from}&to=${to}&page=${p}`}
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold ${p === safePage ? "bg-black text-white" : "hover:bg-gray-50"}`}
+                >
+                  {p}
+                </Link>
+              ))}
+              <Link
+                href={`/dashboard/invoices?status=${status}&date=${date}&type=${type}&from=${from}&to=${to}&page=${Math.min(totalPages, safePage + 1)}`}
+                className={`rounded-lg border px-3 py-2 text-xs font-semibold ${safePage >= totalPages ? "pointer-events-none opacity-50" : "hover:bg-gray-50"}`}
+              >
+                التالي
+              </Link>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

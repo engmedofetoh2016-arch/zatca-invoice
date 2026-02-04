@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic"
 
 import fontkit from "@pdf-lib/fontkit"
 import arabicReshaper from "arabic-reshaper"
-import { bidi } from "bidi-js"
+import bidiFactory from "bidi-js"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { NextResponse } from "next/server"
@@ -16,6 +16,8 @@ function b64ToUint8Array(base64: string) {
   const bin = Buffer.from(base64, "base64")
   return new Uint8Array(bin)
 }
+
+const bidi = bidiFactory()
 
 export async function GET(
   _req: Request,
@@ -72,8 +74,9 @@ export async function GET(
     const left = 50
 
     function shapeArabic(text: string) {
-      const reshaped = arabicReshaper.reshape(text)
-      return bidi(reshaped)
+      const reshaped = arabicReshaper.convertArabic(text)
+      const levels = bidi.getEmbeddingLevels(reshaped, "rtl")
+      return bidi.getReorderedString(reshaped, levels)
     }
 
     const draw = (text: string, size = 12, useArabic = false) => {

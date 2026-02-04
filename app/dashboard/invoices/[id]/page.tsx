@@ -127,26 +127,27 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const items = itemsRes.rows
 
   return (
-    <div dir="rtl" className="mx-auto max-w-2xl space-y-6 p-6">
-      <div className="flex items-start justify-between gap-3">
+    <div dir="rtl" className="mx-auto max-w-4xl space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="text-xs text-gray-500">تفاصيل الفاتورة</div>
+          <div className="mt-2 flex items-center gap-2">
             <h1 className="text-2xl font-semibold">{typeLabel(inv.invoice_type)} {inv.invoice_number}</h1>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeClass(inv.invoice_type)}`}>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${typeClass(inv.invoice_type)}`}>
               {typeLabel(inv.invoice_type)}
             </span>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusClass(inv.status)}`}>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(inv.status)}`}>
               {statusLabel(inv.status)}
             </span>
           </div>
-          <p className="mt-1 text-sm text-gray-600">تفاصيل الفاتورة</p>
+          <p className="mt-1 text-sm text-gray-600">عرض شامل للبيانات والبنود.</p>
         </div>
 
         <div className="flex gap-2">
-          <Link className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50" href="/dashboard/invoices">
+          <Link className="rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-gray-50" href="/dashboard/invoices">
             رجوع
           </Link>
-          <Link className="rounded-lg bg-black px-4 py-2 text-sm text-white hover:opacity-90" href={`/api/invoices/${id}/pdf`}>
+          <Link className="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90" href={`/api/invoices/${id}/pdf`}>
             تحميل PDF
           </Link>
         </div>
@@ -170,7 +171,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       <InvoiceStatusActions invoiceId={inv.id} status={inv.status} />
       <LinkPayment invoiceId={inv.id} currentLink={inv.payment_link ?? ""} />
 
-      <div className="rounded-xl border bg-white p-5 shadow-sm space-y-3 text-sm">
+      <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-3 text-sm">
         <div className="flex justify-between"><span className="text-gray-500">العميل</span><span className="font-semibold">{inv.customer_name ?? "-"}</span></div>
         <div className="flex justify-between"><span className="text-gray-500">الرقم الضريبي</span><span className="font-semibold">{inv.customer_vat ?? "-"}</span></div>
         {inv.original_invoice_id && (
@@ -179,11 +180,18 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         {inv.note_reason && (
           <div className="flex justify-between"><span className="text-gray-500">السبب</span><span className="font-semibold">{inv.note_reason}</span></div>
         )}
-        {inv.uuid && (
-          <div className="flex justify-between"><span className="text-gray-500">UUID</span><span className="font-semibold">{inv.uuid}</span></div>
-        )}
-        {inv.invoice_hash && (
-          <div className="flex justify-between"><span className="text-gray-500">Hash</span><span className="font-semibold">{inv.invoice_hash}</span></div>
+        {(inv.uuid || inv.invoice_hash) && (
+          <details className="mt-2 rounded-lg border bg-gray-50 px-3 py-2">
+            <summary className="cursor-pointer text-xs font-semibold text-gray-700">تفاصيل تقنية</summary>
+            <div className="mt-2 space-y-2 text-xs">
+              {inv.uuid && (
+                <div className="flex justify-between"><span className="text-gray-500">UUID</span><span className="font-semibold">{inv.uuid}</span></div>
+              )}
+              {inv.invoice_hash && (
+                <div className="flex justify-between"><span className="text-gray-500">Hash</span><span className="font-semibold">{inv.invoice_hash}</span></div>
+              )}
+            </div>
+          </details>
         )}
         <div className="h-px bg-gray-100" />
         <div className="flex justify-between"><span className="text-gray-500">الإجمالي قبل الضريبة</span><span className="font-semibold">{formatSar(inv.subtotal)}</span></div>
@@ -197,7 +205,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      <div className="rounded-xl border bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border bg-white p-6 shadow-sm">
         <div className="mb-3 text-sm font-semibold">بنود الفاتورة</div>
         {items.length === 0 ? (
           <div className="text-sm text-gray-500">لا توجد بنود.</div>

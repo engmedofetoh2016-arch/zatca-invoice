@@ -9,7 +9,70 @@ import { getClientIp, requireCsrf } from "@/lib/security"
 type Row = Record<string, string>
 
 function normalizeHeader(h: string) {
-  return h.trim().toLowerCase()
+  const key = h.trim().toLowerCase()
+  const map: Record<string, string> = {
+    "رقم الفاتورة": "invoice_number",
+    "رقم_الفاتورة": "invoice_number",
+    "رقم-الفاتورة": "invoice_number",
+    "invoice no": "invoice_number",
+    "invoice_no": "invoice_number",
+    "invoice number": "invoice_number",
+    "وصف الصنف": "item_description",
+    "وصف_الصنف": "item_description",
+    "وصف-الصنف": "item_description",
+    "وصف السلعة": "item_description",
+    "وصف_السلعة": "item_description",
+    "وصف-السلعة": "item_description",
+    "item description": "item_description",
+    "item_desc": "item_description",
+    "الكمية": "item_qty",
+    "كميه": "item_qty",
+    "qty": "item_qty",
+    "quantity": "item_qty",
+    "سعر الوحدة": "item_unit_price",
+    "سعر_الوحدة": "item_unit_price",
+    "سعر-الوحدة": "item_unit_price",
+    "unit price": "item_unit_price",
+    "unit_price": "item_unit_price",
+    "معدل الضريبة": "item_vat_rate",
+    "معدل_الضريبة": "item_vat_rate",
+    "vat rate": "item_vat_rate",
+    "vat_rate": "item_vat_rate",
+    "سبب الإعفاء": "item_vat_exempt_reason",
+    "سبب_الإعفاء": "item_vat_exempt_reason",
+    "سبب الاعفاء": "item_vat_exempt_reason",
+    "سبب_الاعفاء": "item_vat_exempt_reason",
+    "vat exempt reason": "item_vat_exempt_reason",
+    "invoice type": "invoice_type",
+    "invoice_type": "invoice_type",
+    "نوع الفاتورة": "invoice_type",
+    "نوع_الفاتورة": "invoice_type",
+    "رقم الفاتورة الأصلية": "original_invoice_id",
+    "رقم_الفاتورة_الأصلية": "original_invoice_id",
+    "رقم الفاتورة الاصلية": "original_invoice_id",
+    "رقم_الفاتورة_الاصلية": "original_invoice_id",
+    "original invoice id": "original_invoice_id",
+    "original_invoice_id": "original_invoice_id",
+    "سبب الإشعار": "note_reason",
+    "سبب_الإشعار": "note_reason",
+    "سبب الاشعار": "note_reason",
+    "سبب_الاشعار": "note_reason",
+    "note reason": "note_reason",
+    "note_reason": "note_reason",
+    "اسم العميل": "customer_name",
+    "اسم_العميل": "customer_name",
+    "customer name": "customer_name",
+    "customer_name": "customer_name",
+    "رقم ضريبة العميل": "customer_vat",
+    "رقم_ضريبة_العميل": "customer_vat",
+    "customer vat": "customer_vat",
+    "customer_vat": "customer_vat",
+    "تاريخ الفاتورة": "issue_date",
+    "تاريخ_الفاتورة": "issue_date",
+    "issue date": "issue_date",
+    "issue_date": "issue_date",
+  }
+  return map[key] ?? key
 }
 
 export async function POST(req: Request) {
@@ -45,10 +108,19 @@ export async function POST(req: Request) {
   }
 
   const headers = rows[0].map(normalizeHeader)
-  const required = ["invoice_number", "item_description", "item_qty", "item_unit_price"]
-  const missing = required.filter((r) => !headers.includes(r))
-  if (missing.length > 0) {
-    return NextResponse.json({ error: `Missing columns: ${missing.join(", ")}` }, { status: 400 })
+  const hasInvoiceNumber = headers.includes("invoice_number")
+  const itemRequired = ["item_description", "item_qty", "item_unit_price"]
+  const hasItemCols = itemRequired.every((r) => headers.includes(r))
+  const totalsRequired = ["subtotal", "vat_amount", "total"]
+  const hasTotals = totalsRequired.every((r) => headers.includes(r))
+  if (!hasInvoiceNumber) {
+    return NextResponse.json({ error: "العمود المطلوب مفقود: invoice_number" }, { status: 400 })
+  }
+  if (!hasItemCols && !hasTotals) {
+    return NextResponse.json(
+      { error: "يجب توفير أعمدة الأصناف أو أعمدة الإجمالي (subtotal, vat_amount, total)" },
+      { status: 400 }
+    )
   }
 
   const parsed: Row[] = rows.slice(1).map((r) => {
@@ -81,25 +153,42 @@ export async function POST(req: Request) {
       const invoiceType = rawType === "credit" || rawType === "debit" ? rawType : "invoice"
       const originalInvoiceId = items[0]?.original_invoice_id ? String(items[0].original_invoice_id).trim() : null
       const noteReason = items[0]?.note_reason ? String(items[0].note_reason).trim() : null
+      const rawStatus = items[0]?.status ? String(items[0].status).trim() : "issued"
+      const status =
+        rawStatus === "draft" ||
+        rawStatus === "issued" ||
+        rawStatus === "reported" ||
+        rawStatus === "cleared" ||
+        rawStatus === "rejected"
+          ? rawStatus
+          : "issued"
       if ((invoiceType === "credit" || invoiceType === "debit") && !originalInvoiceId) {
         continue
       }
 
-      const computed = items.map((it) => {
-        const description = String(it.item_description ?? "").trim()
-        const qty = Number(it.item_qty ?? 0)
-        const unitPrice = Number(it.item_unit_price ?? 0)
-        const vatRate = it.item_vat_rate ? Number(it.item_vat_rate) : 0.15
-        const vatExemptReason = it.item_vat_exempt_reason ? String(it.item_vat_exempt_reason).trim() : null
-        const lineTotal = +(qty * unitPrice).toFixed(2)
-        return { description, qty, unitPrice, vatRate, vatExemptReason, lineTotal }
-      }).filter((it) => it.description && it.qty > 0)
+      const computed = hasItemCols
+        ? items.map((it) => {
+            const description = String(it.item_description ?? "").trim()
+            const qty = Number(it.item_qty ?? 0)
+            const unitPrice = Number(it.item_unit_price ?? 0)
+            const vatRate = it.item_vat_rate ? Number(it.item_vat_rate) : 0.15
+            const vatExemptReason = it.item_vat_exempt_reason ? String(it.item_vat_exempt_reason).trim() : null
+            const lineTotal = +(qty * unitPrice).toFixed(2)
+            return { description, qty, unitPrice, vatRate, vatExemptReason, lineTotal }
+          }).filter((it) => it.description && it.qty > 0)
+        : []
 
-      if (computed.length === 0) continue
+      if (hasItemCols && computed.length === 0) continue
 
-      const subtotal = computed.reduce((s, it) => s + it.lineTotal, 0)
-      const vatAmount = +computed.reduce((s, it) => s + it.lineTotal * (it.vatRate ?? 0), 0).toFixed(2)
-      const total = +(subtotal + vatAmount).toFixed(2)
+      const subtotal = hasItemCols
+        ? computed.reduce((s, it) => s + it.lineTotal, 0)
+        : Number(items[0]?.subtotal ?? 0)
+      const vatAmount = hasItemCols
+        ? +computed.reduce((s, it) => s + it.lineTotal * (it.vatRate ?? 0), 0).toFixed(2)
+        : Number(items[0]?.vat_amount ?? 0)
+      const total = hasItemCols
+        ? +(subtotal + vatAmount).toFixed(2)
+        : Number(items[0]?.total ?? (subtotal + vatAmount))
       const sign = invoiceType === "credit" ? -1 : 1
       const signedSubtotal = +(subtotal * sign).toFixed(2)
       const signedVatAmount = +(vatAmount * sign).toFixed(2)
@@ -109,7 +198,7 @@ export async function POST(req: Request) {
         `INSERT INTO invoices (business_id, invoice_number, issue_date, customer_name, customer_vat, subtotal, vat_amount, total, status, status_changed_at, invoice_type, original_invoice_id, note_reason)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),$10,$11,$12)
          RETURNING id`,
-        [business.id, invoiceNumber, issueDate, customerName, customerVat, signedSubtotal, signedVatAmount, signedTotal, "issued", invoiceType, originalInvoiceId, noteReason]
+        [business.id, invoiceNumber, issueDate, customerName, customerVat, signedSubtotal, signedVatAmount, signedTotal, status, invoiceType, originalInvoiceId, noteReason]
       )
       const invoiceId = invRes.rows[0].id as string
 

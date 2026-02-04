@@ -5,9 +5,10 @@ import { pool } from "@/lib/db"
 import { rateLimit } from "@/lib/rate-limit"
 import { getClientIp, requireCsrf } from "@/lib/security"
 import { randomUuid } from "@/lib/crypto"
+import { cookies } from "next/headers";
 
 export async function POST(req: Request) {
-  if (!requireCsrf(req)) {
+  if (!(await requireCsrf(req))) {
     return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 })
   }
 
@@ -74,4 +75,9 @@ export async function POST(req: Request) {
     maxAge: 60 * 60 * 24 * 7,
   })
   return res
+}
+
+export async function csrfCookieValue() {
+  const cookieStore = await cookies();
+  return cookieStore.get("csrf")?.value ?? "";
 }
