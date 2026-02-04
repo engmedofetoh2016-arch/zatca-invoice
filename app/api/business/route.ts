@@ -21,10 +21,12 @@ export async function POST(req: Request) {
   }
 
   const form = await req.formData()
-  const csrfToken = String(form.get("csrf") ?? "")
-  if (!requireCsrf(req, csrfToken)) {
-    return new Response("CSRF validation failed", { status: 403 })
-  }
+
+if (!(await requireCsrf(req))) {
+  return new Response("CSRF validation failed", { status: 403 })
+}
+
+
   const name = form.get("name")
   const vat = form.get("vat")
   const cr = form.get("cr")
