@@ -88,83 +88,101 @@ export async function GET(
 
     function shapeArabic(text: string) {
       const reshaped = arabicReshaper.convertArabic(text)
-      const levels = bidi.getEmbeddingLevels(reshaped, "ltr")
-      return bidi.getReorderedString(reshaped, levels)
+      const levels = bidi.getEmbeddingLevels(reshaped, "rtl")
+      const visual = bidi.getReorderedString(reshaped, levels)
+      return Array.from(visual).reverse().join("")
     }
 
     const hasArabic = (text: string) => /[\u0600-\u06FF]/.test(text)
-    const draw = (text: string, size = 12, useArabic = false) => {
-      const useAr = useArabic || hasArabic(text)
-      const content = useAr ? shapeArabic(text) : text
+    const rightX = 545.28
+    const drawRight = (text: string, size = 12, rtl = false) => {
+      const content = rtl ? shapeArabic(text) : text
+      const useFont = rtl ? cairoFont : font
+      const width = useFont.widthOfTextAtSize(content, size)
       page.drawText(content, {
-        x: left,
-        y,
-        size,
-        font: useAr ? cairoFont : font,
-      })
-      y -= size + 6
-    }
-
-    const drawArabicRight = (text: string, size = 12, rightX = 545.28) => {
-      const shaped = shapeArabic(text)
-      const width = cairoFont.widthOfTextAtSize(shaped, size)
-      page.drawText(shaped, {
         x: rightX - width,
         y,
         size,
-        font: cairoFont,
+        font: useFont,
       })
       y -= size + 6
     }
 
-    const titleAr = inv.invoice_type === "credit" ? "إشعار دائن" : inv.invoice_type === "debit" ? "إشعار مدين" : "فاتورة ضريبية"
+    const formatSar = (amount: number) =>
+      new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR" }).format(amount)
 
-    drawArabicRight(titleAr, 18)
+    const titleAr =
+      inv.invoice_type === "credit"
+        ? "إشعار دائن"
+        : inv.invoice_type === "debit"
+        ? "إشعار مدين"
+        : "فاتورة ضريبية"
+
+    drawRight(titleAr, 18, true)
     y -= 10
 
-    drawArabicRight(`البائع: ${inv.seller_name ?? "-"}`, 12)
-    drawArabicRight(`الرقم الضريبي: ${inv.seller_vat ?? "-"}`, 12)
-    drawArabicRight(`السجل التجاري: ${inv.seller_cr ?? "-"}`, 12)
+    drawRight("البائع", 11, true)
+    drawRight(String(inv.seller_name ?? "-"), 12, hasArabic(String(inv.seller_name ?? "")))
+    drawRight("الرقم الضريبي", 11, true)
+    drawRight(String(inv.seller_vat ?? "-"), 12, false)
+    drawRight("السجل التجاري", 11, true)
+    drawRight(String(inv.seller_cr ?? "-"), 12, false)
     y -= 10
 
-    drawArabicRight(`رقم الفاتورة: ${inv.invoice_number}`, 12)
-    drawArabicRight(`التاريخ: ${new Date(inv.issue_date).toLocaleString("ar-SA")}`, 12)
+    drawRight("رقم الفاتورة", 11, true)
+    drawRight(String(inv.invoice_number), 12, false)
+    drawRight("التاريخ", 11, true)
+    drawRight(new Date(inv.issue_date).toLocaleString("ar-SA"), 12, true)
     if (inv.uuid) {
-      drawArabicRight(`المعرّف (UUID): ${inv.uuid}`, 10)
+      drawRight("المعرّف (UUID)", 10, true)
+      drawRight(String(inv.uuid), 10, false)
     }
     if (inv.invoice_hash) {
-      drawArabicRight(`التجزئة: ${inv.invoice_hash}`, 8)
+      drawRight("التجزئة", 9, true)
+      drawRight(String(inv.invoice_hash), 8, false)
     }
     if (inv.original_invoice_id) {
-      drawArabicRight(`الفاتورة الأصلية: ${inv.original_invoice_id}`, 10)
+      drawRight("الفاتورة الأصلية", 10, true)
+      drawRight(String(inv.original_invoice_id), 10, false)
     }
     if (inv.note_reason) {
-      drawArabicRight(`السبب: ${inv.note_reason}`, 10)
+      drawRight("السبب", 10, true)
+      drawRight(String(inv.note_reason), 10, hasArabic(String(inv.note_reason)))
     }
     y -= 10
 
-    drawArabicRight(`العميل: ${inv.customer_name || "-"}`, 12)
-    drawArabicRight(`رقم ضريبة العميل: ${inv.customer_vat || "-"}`, 12)
+    drawRight("العميل", 11, true)
+    drawRight(String(inv.customer_name || "-"), 12, hasArabic(String(inv.customer_name || "")))
+    drawRight("الرقم الضريبي", 11, true)
+    drawRight(String(inv.customer_vat || "-"), 12, false)
     y -= 10
 
-    drawArabicRight("بنود الفاتورة:", 13)
+    drawRight("بنود الفاتورة", 13, true)
     y -= 4
 
     for (const it of itemsRes.rows) {
       const ratePct = ((Number(it.vat_rate) || 0) * 100).toFixed(0)
-      drawArabicRight(
-        `- ${it.description} | الكمية: ${it.qty} | السعر: ${it.unit_price} | الإجمالي: ${it.line_total} | الضريبة: ${ratePct}%`,
-        11
+      const desc = String(it.description ?? "-")
+      drawRight(desc, 12, hasArabic(desc))
+      drawRight(
+        `الكمية: ${Number(it.qty).toFixed(2)} × السعر: ${Number(it.unit_price).toFixed(2)}`,
+        10,
+        true
       )
+      drawRight(`VAT: ${ratePct}% | ${formatSar(Number(it.vat_amount ?? 0))}`, 10, false)
       if (y < 160) break
     }
 
     y -= 10
-    drawArabicRight(`الإجمالي قبل الضريبة: ${Number(inv.subtotal).toFixed(2)} ر.س`, 12)
-    drawArabicRight(`الضريبة (15%): ${Number(inv.vat_amount).toFixed(2)} ر.س`, 12)
-    drawArabicRight(`الإجمالي: ${Number(inv.total).toFixed(2)} ر.س`, 14)
+    drawRight("الإجمالي قبل الضريبة", 11, true)
+    drawRight(formatSar(Number(inv.subtotal)), 12, true)
+    drawRight("ضريبة القيمة المضافة", 11, true)
+    drawRight(formatSar(Number(inv.vat_amount)), 12, true)
+    drawRight("الإجمالي", 12, true)
+    drawRight(formatSar(Number(inv.total)), 14, true)
     if (inv.payment_link) {
-      drawArabicRight(`رابط الدفع: ${inv.payment_link}`, 10)
+      drawRight("رابط الدفع", 10, true)
+      drawRight(String(inv.payment_link), 10, false)
     }
 
     if (qrImage) {
