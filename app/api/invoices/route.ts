@@ -47,14 +47,14 @@ export async function POST(req: Request) {
   const customerId = body?.customerId ? String(body.customerId).trim() : null
   const items: Item[] = validated.items
   const invoiceType = validated.invoiceType === "credit" || validated.invoiceType === "debit" ? validated.invoiceType : "invoice"
-  const originalInvoiceId = validated.originalInvoiceId
+  const originalInvoiceIdInput = validated.originalInvoiceId
   const noteReason = validated.noteReason
 
   if (status === "issued" && items.length === 0) {
     return NextResponse.json({ error: "items is required for issued invoices" }, { status: 400 })
   }
 
-  if ((invoiceType === "credit" || invoiceType === "debit") && !originalInvoiceId) {
+  if ((invoiceType === "credit" || invoiceType === "debit") && !originalInvoiceIdInput) {
     return NextResponse.json({ error: "originalInvoiceId is required for credit/debit notes" }, { status: 400 })
   }
 
@@ -126,6 +126,25 @@ export async function POST(req: Request) {
       })),
     })
     const invoiceHash = hashInvoiceXml(ubl.xml)
+
+    let originalInvoiceId: string | null = null
+    if (originalInvoiceIdInput) {
+      const raw = String(originalInvoiceIdInput).trim()
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw)
+      if (isUuid) {
+        originalInvoiceId = raw
+      } else {
+        const origRes = await client.query(
+          `SELECT id FROM invoices WHERE business_id = $1 AND invoice_number = $2 LIMIT 1`,
+          [businessId, raw]
+        )
+        if (!origRes.rows[0]) {
+          await client.query("ROLLBACK")
+          return NextResponse.json({ error: "Original invoice not found" }, { status: 400 })
+        }
+        originalInvoiceId = origRes.rows[0].id
+      }
+    }
 
     const invRes = await client.query(
       `INSERT INTO invoices (business_id, customer_id, invoice_number, customer_name, customer_vat, subtotal, vat_amount, total, status, status_changed_at, invoice_type, original_invoice_id, note_reason)
