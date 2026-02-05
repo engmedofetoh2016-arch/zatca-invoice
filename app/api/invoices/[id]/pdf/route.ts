@@ -84,7 +84,6 @@ export async function GET(
 
 
     let y = 800
-    const left = 50
 
     function shapeArabic(text: string) {
       const reshaped = arabicReshaper.convertArabic(text)
@@ -96,7 +95,6 @@ export async function GET(
     const hasBidiControls = (text: string) => /[\u200E\u200F\u202A-\u202E\u2066-\u2069]/.test(text)
     const stripBidiControls = (text: string) =>
       text.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "")
-    const left = 50
     const rightX = 545.28
     const maxWidth = rightX - left
 
