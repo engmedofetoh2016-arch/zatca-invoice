@@ -84,6 +84,7 @@ export async function GET(
 
 
     let y = 800
+    const left = 50
 
     function shapeArabic(text: string) {
       const reshaped = arabicReshaper.convertArabic(text)
