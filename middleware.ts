@@ -4,9 +4,17 @@ import type { NextRequest } from "next/server"
 export function middleware(req: NextRequest) {
   const token = req.cookies.get("token")?.value
   const csrf = req.cookies.get("csrf")?.value
-  const isProd = process.env.NODE_ENV === "production"
+  const proto = req.headers.get("x-forwarded-proto")
+  const isHttps = proto === "https"
+  const path = req.nextUrl.pathname
 
-  if (req.nextUrl.pathname === "/" && token) {
+  if ((path === "/login" || path === "/signup") && token) {
+    const url = req.nextUrl.clone()
+    url.pathname = "/dashboard"
+    return NextResponse.redirect(url)
+  }
+
+  if (path === "/" && token) {
     const url = req.nextUrl.clone()
     url.pathname = "/dashboard"
     const res = NextResponse.redirect(url)
@@ -16,14 +24,14 @@ export function middleware(req: NextRequest) {
         value: crypto.randomUUID(),
         httpOnly: false,
         sameSite: "lax",
-        secure: false,
+        secure: isHttps,
         path: "/",
       })
     }
     return res
   }
 
-  if (req.nextUrl.pathname.startsWith("/dashboard") && !token) {
+  if (path.startsWith("/dashboard") && !token) {
     const url = req.nextUrl.clone()
     url.pathname = "/login"
     const res = NextResponse.redirect(url)
@@ -33,7 +41,7 @@ export function middleware(req: NextRequest) {
         value: crypto.randomUUID(),
         httpOnly: false,
         sameSite: "lax",
-        secure: false,
+        secure: isHttps,
         path: "/",
       })
     }
@@ -47,7 +55,7 @@ export function middleware(req: NextRequest) {
       value: crypto.randomUUID(),
       httpOnly: false,
       sameSite: "lax",
-      secure: false,
+      secure: isHttps,
       path: "/",
     })
   }

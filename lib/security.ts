@@ -18,3 +18,9 @@ export async function requireCsrf(req: Request) {
   const csrfHeader = req.headers.get("x-csrf-token") ?? "";
   return csrfCookie !== "" && csrfCookie === csrfHeader;
 }
+
+export async function requireCsrfToken(token: string) {
+  const cookieStore = await cookies();
+  const csrfCookie = cookieStore.get("csrf")?.value ?? "";
+  return csrfCookie !== "" && csrfCookie === token;
+}

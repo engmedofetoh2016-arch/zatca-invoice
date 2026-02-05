@@ -2,7 +2,7 @@ import { pool } from "@/lib/db"
 import { cookies } from "next/headers"
 import { verifyToken } from "@/lib/auth"
 import { rateLimit } from "@/lib/rate-limit"
-import { getClientIp, requireCsrf } from "@/lib/security"
+import { getClientIp, requireCsrf, requireCsrfToken } from "@/lib/security"
 
 export async function POST(req: Request) {
   const cookieStore = await cookies()
@@ -21,10 +21,10 @@ export async function POST(req: Request) {
   }
 
   const form = await req.formData()
-
-if (!(await requireCsrf(req))) {
-  return new Response("CSRF validation failed", { status: 403 })
-}
+  const csrfToken = String(form.get("csrf") ?? "")
+  if (!(await requireCsrf(req)) && !(await requireCsrfToken(csrfToken))) {
+    return new Response("CSRF validation failed", { status: 403 })
+  }
 
 
   const name = form.get("name")
