@@ -1,11 +1,6 @@
 ﻿export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-import fontkit from "@pdf-lib/fontkit"
-import arabicReshaper from "arabic-reshaper"
-import bidiFactory from "bidi-js"
-import { readFile } from "node:fs/promises"
-import path from "node:path"
 import { NextResponse } from "next/server"
 import { PDFDocument, StandardFonts } from "pdf-lib"
 import { pool } from "@/lib/db"
@@ -16,8 +11,6 @@ function b64ToUint8Array(base64: string) {
   const bin = Buffer.from(base64, "base64")
   return new Uint8Array(bin)
 }
-
-const bidi = bidiFactory()
 
 export async function GET(
   _req: Request,
@@ -77,44 +70,21 @@ export async function GET(
 
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
 
-    pdfDoc.registerFontkit(fontkit)
-    const fontPath = path.join(process.cwd(), "public", "fonts", "Cairo-Regular.ttf")
-    const fontBytes = await readFile(fontPath)
-    const cairoFont = await pdfDoc.embedFont(fontBytes)
-
-
     let y = 800
     const left = 50
-
-    function shapeArabic(text: string) {
-      const reshaped = arabicReshaper.convertArabic(text)
-      const levels = bidi.getEmbeddingLevels(reshaped, "rtl")
-      return bidi.getReorderedString(reshaped, levels)
-    }
-
-    const hasArabic = (text: string) => /[\u0600-\u06FF]/.test(text)
-    const hasBidiControls = (text: string) => /[\u200E\u200F\u202A-\u202E\u2066-\u2069]/.test(text)
-    const stripBidiControls = (text: string) =>
-      text.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "")
     const rightX = 545.28
     const maxWidth = rightX - left
 
-    const measure = (text: string, size: number, rtl: boolean) => {
-      const cleaned = stripBidiControls(text)
-      const content = rtl ? shapeArabic(cleaned) : cleaned
-      const useFont = rtl ? cairoFont : font
-      return useFont.widthOfTextAtSize(content, size)
-    }
+    const measure = (text: string, size: number) => font.widthOfTextAtSize(text, size)
 
-    const wrapText = (text: string, size: number, rtl: boolean, width: number) => {
-      const cleaned = stripBidiControls(text)
-      const words = cleaned.split(/\s+/).filter(Boolean)
+    const wrapText = (text: string, size: number, width: number) => {
+      const words = String(text ?? "").split(/\s+/).filter(Boolean)
       if (words.length === 0) return [""]
       const lines: string[] = []
       let line = ""
       for (const w of words) {
         const next = line ? `${line} ${w}` : w
-        if (measure(next, size, rtl) <= width) {
+        if (measure(next, size) <= width) {
           line = next
         } else {
           if (line) lines.push(line)
@@ -125,84 +95,78 @@ export async function GET(
       return lines
     }
 
-    const drawRightLine = (text: string, size = 12, rtl = false, xRight = rightX) => {
-      const cleaned = stripBidiControls(text)
-      const content = rtl ? shapeArabic(cleaned) : cleaned
-      const useFont = rtl ? cairoFont : font
-      const width = useFont.widthOfTextAtSize(content, size)
-      page.drawText(content, {
-        x: xRight - width,
-        y,
-        size,
-        font: useFont,
-      })
+    const drawLeftLine = (text: string, size = 12, xLeft = left) => {
+      page.drawText(text, { x: xLeft, y, size, font })
     }
 
-    const drawRight = (text: string, size = 12, rtl = false) => {
-      drawRightLine(text, size, rtl, rightX)
-      y -= size + 6
+    const drawLeft = (text: string, size = 12, gap = 6) => {
+      drawLeftLine(text, size, left)
+      y -= size + gap
     }
 
-    const drawRightWrapped = (text: string, size = 12, rtl = false) => {
-      const lines = wrapText(text, size, rtl, maxWidth)
+    const drawLeftWrapped = (text: string, size = 12, gap = 6) => {
+      const lines = wrapText(text, size, maxWidth)
       for (const line of lines) {
-        drawRightLine(line, size, rtl, rightX)
-        y -= size + 6
+        drawLeftLine(line, size, left)
+        y -= size + gap
       }
     }
 
     const formatSar = (amount: number) =>
-      stripBidiControls(
-        new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR" }).format(amount)
-      )
+      new Intl.NumberFormat("en-US", { style: "currency", currency: "SAR" }).format(amount)
 
-    const titleAr =
+    const titleEn =
       inv.invoice_type === "credit"
-        ? "إشعار دائن"
+        ? "Credit Note"
         : inv.invoice_type === "debit"
-        ? "إشعار مدين"
-        : "فاتورة ضريبية"
+        ? "Debit Note"
+        : "Tax Invoice"
 
-    drawRight(titleAr, 18, true)
-    y -= 10
+    drawLeft(titleEn, 16, 4)
+    y -= 6
 
-    drawRight("البائع", 11, true)
-    drawRightWrapped(String(inv.seller_name ?? "-"), 12, true)
-    drawRight("الرقم الضريبي", 11, true)
-    drawRight(String(inv.seller_vat ?? "-"), 12, false)
-    drawRight("السجل التجاري", 11, true)
-    drawRight(String(inv.seller_cr ?? "-"), 12, false)
-    y -= 10
+    const labelSize = 9
+    const valueSize = 10
+    const labelGap = 2
+    const valueGap = 4
 
-    drawRight("رقم الفاتورة", 11, true)
-    drawRight(String(inv.invoice_number), 12, false)
-    drawRight("التاريخ", 11, true)
-    drawRight(new Date(inv.issue_date).toLocaleString("ar-SA"), 12, true)
+    drawLeft("Seller", labelSize, labelGap)
+    drawLeftWrapped(String(inv.seller_name ?? "-"), valueSize, valueGap)
+    drawLeft("VAT Number", labelSize, labelGap)
+    drawLeft(String(inv.seller_vat ?? "-"), valueSize, valueGap)
+    drawLeft("CR Number", labelSize, labelGap)
+    drawLeft(String(inv.seller_cr ?? "-"), valueSize, valueGap)
+    y -= 6
+
+    drawLeft("Invoice Number", labelSize, labelGap)
+    drawLeft(String(inv.invoice_number), valueSize, valueGap)
+    drawLeft("Date", labelSize, labelGap)
+    drawLeft(new Date(inv.issue_date).toLocaleString("en-US"), valueSize, valueGap)
     if (inv.uuid) {
-      drawRight("المعرّف (UUID)", 10, true)
-      drawRightWrapped(String(inv.uuid), 10, false)
+      drawLeft("UUID", labelSize, labelGap)
+      drawLeftWrapped(String(inv.uuid), valueSize, valueGap)
     }
     if (inv.invoice_hash) {
-      drawRight("التجزئة", 9, true)
-      drawRightWrapped(String(inv.invoice_hash), 8, false)
+      drawLeft("Hash", labelSize, labelGap)
+      drawLeftWrapped(String(inv.invoice_hash), valueSize - 1, valueGap)
     }
     if (inv.original_invoice_id) {
-      drawRight("الفاتورة الأصلية", 10, true)
-      drawRightWrapped(String(inv.original_invoice_id), 10, false)
+      drawLeft("Original Invoice", labelSize, labelGap)
+      drawLeftWrapped(String(inv.original_invoice_id), valueSize, valueGap)
     }
     if (inv.note_reason) {
-      drawRight("السبب", 10, true)
-      drawRight(String(inv.note_reason), 10, hasArabic(String(inv.note_reason)))
+      drawLeft("Reason", labelSize, labelGap)
+      drawLeft(String(inv.note_reason), valueSize, valueGap)
     }
-    y -= 10
+    y -= 6
 
-    drawRight("العميل", 11, true)
-    drawRightWrapped(String(inv.customer_name || "-"), 12, true)
-    drawRight("الرقم الضريبي", 11, true)
-    drawRight(String(inv.customer_vat || "-"), 12, false)
-    y -= 10
+    drawLeft("Customer", labelSize, labelGap)
+    drawLeftWrapped(String(inv.customer_name || "-"), valueSize, valueGap)
+    drawLeft("Customer VAT", labelSize, labelGap)
+    drawLeft(String(inv.customer_vat || "-"), valueSize, valueGap)
+    y -= 8
 
-    drawRight("بنود الفاتورة", 13, true)
+    drawLeft("Invoice Items", 13)
     y -= 6
 
     const tableLeft = left
@@ -213,43 +177,33 @@ export async function GET(
     const colQty = 60
     const colItem = tableRight - tableLeft - (colVat + colTotal + colUnit + colQty)
 
-    const colRightVat = tableRight
-    const colRightTotal = colRightVat - colVat
-    const colRightUnit = colRightTotal - colTotal
-    const colRightQty = colRightUnit - colUnit
-    const colRightItem = colRightQty - colQty
+    const colLeftItem = tableLeft
+    const colLeftQty = colLeftItem + colItem
+    const colLeftUnit = colLeftQty + colQty
+    const colLeftTotal = colLeftUnit + colUnit
+    const colLeftVat = colLeftTotal + colTotal
 
-    const drawCellRight = (text: string, size: number, rtl: boolean, colRight: number, colWidth: number) => {
-      const cleaned = stripBidiControls(text)
-      const content = rtl ? shapeArabic(cleaned) : cleaned
-      const useFont = rtl ? cairoFont : font
-      const width = Math.min(useFont.widthOfTextAtSize(content, size), colWidth)
-      page.drawText(content, {
-        x: colRight - width,
-        y,
-        size,
-        font: useFont,
-      })
+    const drawCellLeft = (text: string, size: number, colLeft: number) => {
+      page.drawText(text, { x: colLeft, y, size, font })
     }
 
     // header
-    drawCellRight("الصنف", 11, true, colRightItem, colItem)
-    drawCellRight("الكمية", 11, true, colRightQty, colQty)
-    drawCellRight("السعر", 11, true, colRightUnit, colUnit)
-    drawCellRight("الإجمالي", 11, true, colRightTotal, colTotal)
-    drawCellRight("الضريبة", 11, true, colRightVat, colVat)
+    drawCellLeft("Item", 11, colLeftItem)
+    drawCellLeft("Qty", 11, colLeftQty)
+    drawCellLeft("Unit", 11, colLeftUnit)
+    drawCellLeft("Total", 11, colLeftTotal)
+    drawCellLeft("VAT", 11, colLeftVat)
     y -= 16
 
     for (const it of itemsRes.rows) {
       const ratePct = ((Number(it.vat_rate) || 0) * 100).toFixed(0)
       const desc = String(it.description ?? "-")
-      const descLines = wrapText(desc, 11, true, colItem)
-      const rowLines = Math.max(1, descLines.length)
+      const descLines = wrapText(desc, 11, colItem)
 
       // description (may wrap)
       for (let i = 0; i < descLines.length; i++) {
         const line = descLines[i]
-        drawCellRight(line, 11, true, colRightItem, colItem)
+        drawCellLeft(line, 11, colLeftItem)
         if (i < descLines.length - 1) {
           y -= 14
         }
@@ -261,25 +215,25 @@ export async function GET(
       const totalText = Number(it.line_total ?? 0).toFixed(2)
       const vatText = `${ratePct}%`
 
-      drawCellRight(qtyText, 11, false, colRightQty, colQty)
-      drawCellRight(unitText, 11, false, colRightUnit, colUnit)
-      drawCellRight(totalText, 11, false, colRightTotal, colTotal)
-      drawCellRight(vatText, 11, false, colRightVat, colVat)
+      drawCellLeft(qtyText, 11, colLeftQty)
+      drawCellLeft(unitText, 11, colLeftUnit)
+      drawCellLeft(totalText, 11, colLeftTotal)
+      drawCellLeft(vatText, 11, colLeftVat)
 
       y -= 16
       if (y < 160) break
     }
 
     y -= 10
-    drawRight("الإجمالي قبل الضريبة", 11, true)
-    drawRight(formatSar(Number(inv.subtotal)), 12, true)
-    drawRight("ضريبة القيمة المضافة", 11, true)
-    drawRight(formatSar(Number(inv.vat_amount)), 12, true)
-    drawRight("الإجمالي", 12, true)
-    drawRight(formatSar(Number(inv.total)), 14, true)
+    drawLeft("Subtotal", 11)
+    drawLeft(formatSar(Number(inv.subtotal)), 12)
+    drawLeft("VAT", 11)
+    drawLeft(formatSar(Number(inv.vat_amount)), 12)
+    drawLeft("Total", 12)
+    drawLeft(formatSar(Number(inv.total)), 14)
     if (inv.payment_link) {
-      drawRight("رابط الدفع", 10, true)
-      drawRight(String(inv.payment_link), 10, false)
+      drawLeft("Payment Link", 10)
+      drawLeft(String(inv.payment_link), 10)
     }
 
     if (qrImage) {
