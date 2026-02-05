@@ -117,57 +117,54 @@ export async function GET(
       y -= size + 6
     }
 
-    const titleEn = inv.invoice_type === "credit" ? "Credit Note" : inv.invoice_type === "debit" ? "Debit Note" : "Tax Invoice"
     const titleAr = inv.invoice_type === "credit" ? "إشعار دائن" : inv.invoice_type === "debit" ? "إشعار مدين" : "فاتورة ضريبية"
 
-    draw(titleEn, 16, false)
-    drawArabicRight(titleAr, 16)
+    drawArabicRight(titleAr, 18)
     y -= 10
 
-    draw(`Seller: ${inv.seller_name}`, 12, false)
-    draw(`VAT: ${inv.seller_vat}`, 12, false)
-    draw(`CR: ${inv.seller_cr}`, 12, false)
+    drawArabicRight(`البائع: ${inv.seller_name ?? "-"}`, 12)
+    drawArabicRight(`الرقم الضريبي: ${inv.seller_vat ?? "-"}`, 12)
+    drawArabicRight(`السجل التجاري: ${inv.seller_cr ?? "-"}`, 12)
     y -= 10
 
-    draw(`Invoice No: ${inv.invoice_number}`, 12, false)
-    draw(`Date: ${new Date(inv.issue_date).toLocaleString()}`, 12, false)
+    drawArabicRight(`رقم الفاتورة: ${inv.invoice_number}`, 12)
+    drawArabicRight(`التاريخ: ${new Date(inv.issue_date).toLocaleString("ar-SA")}`, 12)
     if (inv.uuid) {
-      draw(`UUID: ${inv.uuid}`, 10, false)
+      drawArabicRight(`المعرّف (UUID): ${inv.uuid}`, 10)
     }
     if (inv.invoice_hash) {
-      draw(`Hash: ${inv.invoice_hash}`, 8, false)
+      drawArabicRight(`التجزئة: ${inv.invoice_hash}`, 8)
     }
     if (inv.original_invoice_id) {
-      draw(`Original Invoice: ${inv.original_invoice_id}`, 10, false)
+      drawArabicRight(`الفاتورة الأصلية: ${inv.original_invoice_id}`, 10)
     }
     if (inv.note_reason) {
-      draw(`Reason: ${inv.note_reason}`, 10, false)
+      drawArabicRight(`السبب: ${inv.note_reason}`, 10)
     }
     y -= 10
 
-    draw(`Customer: ${inv.customer_name || "-"}`, 12, false)
-    draw(`Customer VAT: ${inv.customer_vat || "-"}`, 12, false)
+    drawArabicRight(`العميل: ${inv.customer_name || "-"}`, 12)
+    drawArabicRight(`رقم ضريبة العميل: ${inv.customer_vat || "-"}`, 12)
     y -= 10
 
-    draw("Items:", 13, false)
+    drawArabicRight("بنود الفاتورة:", 13)
     y -= 4
 
     for (const it of itemsRes.rows) {
       const ratePct = ((Number(it.vat_rate) || 0) * 100).toFixed(0)
-      draw(
-        `- ${it.description} | qty: ${it.qty} | unit: ${it.unit_price} | total: ${it.line_total} | VAT: ${ratePct}%`,
-        11,
-        false
+      drawArabicRight(
+        `- ${it.description} | الكمية: ${it.qty} | السعر: ${it.unit_price} | الإجمالي: ${it.line_total} | الضريبة: ${ratePct}%`,
+        11
       )
       if (y < 160) break
     }
 
     y -= 10
-    draw(`Subtotal: ${Number(inv.subtotal).toFixed(2)} SAR`, 12, false)
-    draw(`VAT (15%): ${Number(inv.vat_amount).toFixed(2)} SAR`, 12, false)
-    draw(`TOTAL: ${Number(inv.total).toFixed(2)} SAR`, 14, false)
+    drawArabicRight(`الإجمالي قبل الضريبة: ${Number(inv.subtotal).toFixed(2)} ر.س`, 12)
+    drawArabicRight(`الضريبة (15%): ${Number(inv.vat_amount).toFixed(2)} ر.س`, 12)
+    drawArabicRight(`الإجمالي: ${Number(inv.total).toFixed(2)} ر.س`, 14)
     if (inv.payment_link) {
-      draw(`Payment Link: ${inv.payment_link}`, 10, false)
+      drawArabicRight(`رابط الدفع: ${inv.payment_link}`, 10)
     }
 
     if (qrImage) {
