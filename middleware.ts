@@ -16,7 +16,7 @@ export function middleware(req: NextRequest) {
         value: crypto.randomUUID(),
         httpOnly: false,
         sameSite: "lax",
-        secure: isProd,
+        secure: false,
         path: "/",
       })
     }
@@ -33,7 +33,7 @@ export function middleware(req: NextRequest) {
         value: crypto.randomUUID(),
         httpOnly: false,
         sameSite: "lax",
-        secure: isProd,
+        secure: false,
         path: "/",
       })
     }
@@ -47,7 +47,7 @@ export function middleware(req: NextRequest) {
       value: crypto.randomUUID(),
       httpOnly: false,
       sameSite: "lax",
-      secure: isProd,
+      secure: false,
       path: "/",
     })
   }
