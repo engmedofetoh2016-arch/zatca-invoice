@@ -92,13 +92,15 @@ export async function GET(
       return bidi.getReorderedString(reshaped, levels)
     }
 
+    const hasArabic = (text: string) => /[\u0600-\u06FF]/.test(text)
     const draw = (text: string, size = 12, useArabic = false) => {
-      const content = useArabic ? shapeArabic(text) : text
+      const useAr = useArabic || hasArabic(text)
+      const content = useAr ? shapeArabic(text) : text
       page.drawText(content, {
         x: left,
         y,
         size,
-        font: useArabic ? cairoFont : font,
+        font: useAr ? cairoFont : font,
       })
       y -= size + 6
     }
