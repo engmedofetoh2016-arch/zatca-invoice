@@ -49,14 +49,27 @@ export async function GET(
       [id]
     )
 
-    const qrDataUrl = await zatcaQrDataUrl({
-      sellerName: inv.seller_name,
-      vatNumber: inv.seller_vat,
-      timestampISO: new Date(inv.issue_date).toISOString(),
-      total: Number(inv.total).toFixed(2),
-      vatAmount: Number(inv.vat_amount).toFixed(2),
-    })
-    const qrBytes = b64ToUint8Array(qrDataUrl.split(",")[1])
+    let qrImage: any = null
+    try {
+      const issueDate = new Date(inv.issue_date)
+      const timestampISO = Number.isNaN(issueDate.getTime())
+        ? new Date().toISOString()
+        : issueDate.toISOString()
+      const qrDataUrl = await zatcaQrDataUrl({
+        sellerName: String(inv.seller_name ?? ""),
+        vatNumber: String(inv.seller_vat ?? ""),
+        timestampISO,
+        total: Number(inv.total ?? 0).toFixed(2),
+        vatAmount: Number(inv.vat_amount ?? 0).toFixed(2),
+      })
+      const qrPart = qrDataUrl.split(",")[1]
+      if (qrPart) {
+        const qrBytes = b64ToUint8Array(qrPart)
+        qrImage = await pdfDoc.embedPng(qrBytes)
+      }
+    } catch (e) {
+      console.error("QR ERROR:", e)
+    }
 
     const pdfDoc = await PDFDocument.create()
     const page = pdfDoc.addPage([595.28, 841.89])
@@ -68,7 +81,6 @@ export async function GET(
     const fontBytes = await readFile(fontPath)
     const cairoFont = await pdfDoc.embedFont(fontBytes)
 
-    const qrImage = await pdfDoc.embedPng(qrBytes)
 
     let y = 800
     const left = 50
@@ -155,8 +167,10 @@ export async function GET(
       draw(`Payment Link: ${inv.payment_link}`, 10, false)
     }
 
-    page.drawImage(qrImage, { x: 595.28 - 50 - 140, y: 60, width: 140, height: 140 })
-    page.drawText("ZATCA QR", { x: 595.28 - 50 - 140, y: 45, size: 10, font })
+    if (qrImage) {
+      page.drawImage(qrImage, { x: 595.28 - 50 - 140, y: 60, width: 140, height: 140 })
+      page.drawText("ZATCA QR", { x: 595.28 - 50 - 140, y: 45, size: 10, font })
+    }
 
     const pdfBytes = await pdfDoc.save()
 
