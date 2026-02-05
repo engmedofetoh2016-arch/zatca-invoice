@@ -88,7 +88,7 @@ export async function GET(
 
     function shapeArabic(text: string) {
       const reshaped = arabicReshaper.convertArabic(text)
-      const levels = bidi.getEmbeddingLevels(reshaped, "rtl")
+      const levels = bidi.getEmbeddingLevels(reshaped, "ltr")
       return bidi.getReorderedString(reshaped, levels)
     }
 
