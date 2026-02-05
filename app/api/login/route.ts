@@ -62,7 +62,8 @@ export async function POST(req: Request) {
   )
 
   const token = jwt.sign({ userId: user.id, email: user.email, jti }, secret, { expiresIn: "7d" })
-  const isProd = process.env.NODE_ENV === "production"
+  const proto = req.headers.get("x-forwarded-proto")
+  const isHttps = proto === "https"
 
   const res = NextResponse.json({ ok: true })
   res.cookies.set({
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
     value: token,
     httpOnly: true,
     sameSite: "lax",
-    secure: isProd,
+    secure: isHttps,
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   })
