@@ -94,10 +94,15 @@ export async function GET(
     }
 
     const hasArabic = (text: string) => /[\u0600-\u06FF]/.test(text)
+    const hasBidiControls = (text: string) => /[\u200E\u200F\u202A-\u202E\u2066-\u2069]/.test(text)
+    const stripBidiControls = (text: string) =>
+      text.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "")
     const rightX = 545.28
     const drawRight = (text: string, size = 12, rtl = false) => {
-      const content = rtl ? shapeArabic(text) : text
-      const useFont = rtl ? cairoFont : font
+      const needsArabicFont = rtl || hasArabic(text) || hasBidiControls(text)
+      const cleaned = stripBidiControls(text)
+      const content = needsArabicFont ? shapeArabic(cleaned) : cleaned
+      const useFont = needsArabicFont ? cairoFont : font
       const width = useFont.widthOfTextAtSize(content, size)
       page.drawText(content, {
         x: rightX - width,
@@ -109,7 +114,9 @@ export async function GET(
     }
 
     const formatSar = (amount: number) =>
-      new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR" }).format(amount)
+      stripBidiControls(
+        new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR" }).format(amount)
+      )
 
     const titleAr =
       inv.invoice_type === "credit"
