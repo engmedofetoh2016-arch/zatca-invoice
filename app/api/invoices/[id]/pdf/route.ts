@@ -49,6 +49,8 @@ export async function GET(
       [id]
     )
 
+    const pdfDoc = await PDFDocument.create()
+
     let qrImage: any = null
     try {
       const issueDate = new Date(inv.issue_date)
@@ -71,7 +73,6 @@ export async function GET(
       console.error("QR ERROR:", e)
     }
 
-    const pdfDoc = await PDFDocument.create()
     const page = pdfDoc.addPage([595.28, 841.89])
 
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
