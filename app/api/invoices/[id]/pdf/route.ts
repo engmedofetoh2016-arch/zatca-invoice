@@ -108,7 +108,6 @@ export async function GET(
       .section-title { margin: 18px 0 6px; font-weight: 700; }
       .label { color: #666; font-size: 12px; margin-top: 4px; }
       .value { font-size: 14px; }
-      .divider { height: 1px; background: #eee; margin: 14px 0; }
       .items { display: grid; gap: 10px; }
       .item { border: 1px solid #f0f0f0; padding: 10px 12px; border-radius: 8px; }
       .item-name { font-weight: 700; margin-bottom: 4px; }
@@ -158,7 +157,7 @@ export async function GET(
     const pdf = await page.pdf({ format: "A4", printBackground: true })
     await browser.close()
 
-    return new Response(pdf, {
+    return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${inv.invoice_number}.pdf"`,
