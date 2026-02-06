@@ -29,6 +29,8 @@ export function buildUblInvoice(input: {
     vatAmount: number
   }>
 }) {
+  // TODO(ZATCA-Phase2): Replace this minimal UBL with full UBL 2.1 structure required by ZATCA Phase 2.
+  // Required: profile ID, invoice type codes, tax categories, seller/buyer legal info, and proper namespaces.
   const uuid = input.uuid ?? randomUuid()
 
   const lines = input.items.map((it, i) => {

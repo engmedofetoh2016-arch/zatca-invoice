@@ -241,3 +241,25 @@ CREATE TABLE IF NOT EXISTS zatca_settings (
   certificate_pem TEXT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- 012_zatca_phase2.sql
+ALTER TABLE zatca_jobs
+  ADD COLUMN IF NOT EXISTS response_status INT NULL;
+
+ALTER TABLE zatca_jobs
+  ADD COLUMN IF NOT EXISTS response_body TEXT NULL;
+
+ALTER TABLE zatca_jobs
+  ADD COLUMN IF NOT EXISTS response_at TIMESTAMPTZ NULL;
+
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS zatca_status TEXT NULL;
+
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS zatca_last_response TEXT NULL;
+
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS reported_at TIMESTAMPTZ NULL;
+
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS cleared_at TIMESTAMPTZ NULL;

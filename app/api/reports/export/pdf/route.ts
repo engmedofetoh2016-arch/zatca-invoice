@@ -1,14 +1,15 @@
-﻿import PDFDocument from "pdfkit"
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
+import path from "node:path"
+import { readFile } from "node:fs/promises"
 import { NextResponse } from "next/server"
+import { chromium } from "playwright"
 import { pool } from "@/lib/db"
 import { getCurrentUser } from "@/lib/current"
 import { getBusinessByUserId } from "@/lib/business"
-import { readFile } from "node:fs/promises"
-import path from "node:path"
 
-export const runtime = "nodejs"
-
-function formatSar(amount: number) {
+function formatSarAr(amount: number) {
   return new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR" }).format(amount)
 }
 
@@ -62,70 +63,108 @@ export async function GET() {
     const last = last7Res.rows[0]
     const statusMap = new Map<string, number>(statusRes.rows.map((r: any) => [r.status, r.count]))
 
-    const doc = new PDFDocument({
-      size: "A4",
-      margin: 50,
-      font: path.join(process.cwd(), "public", "fonts", "Cairo-Regular.ttf"),
-    })
-    const chunks: Buffer[] = []
-    doc.on("data", (c) => chunks.push(c))
-    const bufferPromise = new Promise<Buffer>((resolve) => {
-      doc.on("end", () => resolve(Buffer.concat(chunks)))
-    })
-
     const fontPath = path.join(process.cwd(), "public", "fonts", "Cairo-Regular.ttf")
-    const fontBytes = await readFile(fontPath)
-    doc.registerFont("Cairo", fontBytes)
-    doc.font("Cairo")
+    const fontBase64 = (await readFile(fontPath)).toString("base64")
 
-    doc.font("Cairo")
-    doc.fontSize(18).text("تقارير الفواتير", { align: "right" })
-    doc.moveDown(0.5)
-    doc.fontSize(10).text(`تاريخ التقرير: ${now.toISOString().slice(0, 10)}`, { align: "right" })
-    doc.moveDown()
+    const formatDate = (d: Date) =>
+      d.toISOString().slice(0, 10)
 
-    doc.fontSize(14).text("ملخص عام", { align: "right" })
-    doc.fontSize(11)
-    doc.text(`الإجمالي الكلي: ${formatSar(Number(totals.total))}`, { align: "right" })
-    doc.text(`ضريبة القيمة المضافة: ${formatSar(Number(totals.vat))}`, { align: "right" })
-    doc.text(`عدد الفواتير: ${totals.invoices}`, { align: "right" })
-    doc.moveDown()
+    const statusRows = ["issued", "reported", "cleared", "rejected", "draft"]
+      .map((s) => `<div class="row"><span>${s}</span><span>${statusMap.get(s) ?? 0}</span></div>`)
+      .join("")
 
-    doc.fontSize(12).text("هذا الشهر", { align: "right" })
-    doc.fontSize(11)
-    doc.text(`الإجمالي: ${formatSar(Number(month.total))}`, { align: "right" })
-    doc.text(`الضريبة: ${formatSar(Number(month.vat))}`, { align: "right" })
-    doc.text(`عدد الفواتير: ${month.invoices}`, { align: "right" })
-    doc.moveDown()
+    const topRows =
+      topCustomers.rows.length === 0
+        ? `<div class="row"><span>لا توجد بيانات</span><span>-</span></div>`
+        : topCustomers.rows
+            .map(
+              (c: any) =>
+                `<div class="row"><span>${c.customer_name}</span><span>${formatSarAr(Number(c.total))}</span></div>`
+            )
+            .join("")
 
-    doc.fontSize(12).text("آخر 7 أيام", { align: "right" })
-    doc.fontSize(11)
-    doc.text(`الإجمالي: ${formatSar(Number(last.total))}`, { align: "right" })
-    doc.text(`الضريبة: ${formatSar(Number(last.vat))}`, { align: "right" })
-    doc.text(`عدد الفواتير: ${last.invoices}`, { align: "right" })
-    doc.moveDown()
+    const html = `
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: "Cairo";
+        src: url(data:font/ttf;base64,${fontBase64}) format("truetype");
+        font-weight: normal;
+        font-style: normal;
+      }
+      * { box-sizing: border-box; }
+      body {
+        font-family: "Cairo", Arial, sans-serif;
+        margin: 40px;
+        color: #111;
+        font-size: 14px;
+      }
+      h1 { font-size: 20px; margin: 0 0 6px; }
+      .muted { color: #555; font-size: 12px; }
+      .section { margin-top: 16px; }
+      .section-title { font-weight: 700; margin-bottom: 6px; }
+      .card { border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; }
+      .row { display: flex; justify-content: space-between; padding: 2px 0; }
+    </style>
+  </head>
+  <body>
+    <h1>تقارير الفواتير</h1>
+    <div class="muted">تاريخ التقرير: ${formatDate(now)}</div>
 
-    doc.fontSize(12).text("حالات الفواتير", { align: "right" })
-    doc.fontSize(11)
-    ;(["issued", "reported", "cleared", "rejected", "draft"] as const).forEach((s) => {
-      doc.text(`${s}: ${statusMap.get(s) ?? 0}`, { align: "right" })
-    })
-    doc.moveDown()
+    <div class="section">
+      <div class="section-title">ملخص عام</div>
+      <div class="card">
+        <div class="row"><span>الإجمالي الكلي</span><span>${formatSarAr(Number(totals.total))}</span></div>
+        <div class="row"><span>ضريبة القيمة المضافة</span><span>${formatSarAr(Number(totals.vat))}</span></div>
+        <div class="row"><span>عدد الفواتير</span><span>${totals.invoices}</span></div>
+      </div>
+    </div>
 
-    doc.fontSize(12).text("أفضل العملاء", { align: "right" })
-    doc.fontSize(11)
-    if (topCustomers.rows.length === 0) {
-      doc.text("لا توجد بيانات", { align: "right" })
-    } else {
-      topCustomers.rows.forEach((c: any) => {
-        doc.text(`${c.customer_name}: ${formatSar(Number(c.total))}`, { align: "right" })
-      })
-    }
+    <div class="section">
+      <div class="section-title">هذا الشهر</div>
+      <div class="card">
+        <div class="row"><span>الإجمالي</span><span>${formatSarAr(Number(month.total))}</span></div>
+        <div class="row"><span>الضريبة</span><span>${formatSarAr(Number(month.vat))}</span></div>
+        <div class="row"><span>عدد الفواتير</span><span>${month.invoices}</span></div>
+      </div>
+    </div>
 
-    doc.end()
-    const buffer = await bufferPromise
+    <div class="section">
+      <div class="section-title">آخر 7 أيام</div>
+      <div class="card">
+        <div class="row"><span>الإجمالي</span><span>${formatSarAr(Number(last.total))}</span></div>
+        <div class="row"><span>الضريبة</span><span>${formatSarAr(Number(last.vat))}</span></div>
+        <div class="row"><span>عدد الفواتير</span><span>${last.invoices}</span></div>
+      </div>
+    </div>
 
-    return new Response(new Uint8Array(buffer), {
+    <div class="section">
+      <div class="section-title">حالات الفواتير</div>
+      <div class="card">
+        ${statusRows}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">أفضل العملاء</div>
+      <div class="card">
+        ${topRows}
+      </div>
+    </div>
+  </body>
+</html>
+    `
+
+    const browser = await chromium.launch()
+    const page = await browser.newPage()
+    await page.setContent(html, { waitUntil: "networkidle" })
+    const pdf = await page.pdf({ format: "A4", printBackground: true })
+    await browser.close()
+
+    return new Response(pdf, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": "attachment; filename=reports.pdf",

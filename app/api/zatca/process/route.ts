@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
-import { nextPendingJobs, markJobRunning, markJobFailed, markJobDone } from "@/lib/zatca/queue"
+import { nextPendingJobs, markJobRunning, markJobFailed, markJobDone, markJobResult } from "@/lib/zatca/queue"
 import { pool } from "@/lib/db"
 import { getActiveCertificate } from "@/lib/zatca/certificates"
 import { signXmlWithPrivateKey } from "@/lib/zatca/signing"
 import { auditLog } from "@/lib/audit"
+import { validateWithZatcaSdk } from "@/lib/zatca/sdk-client"
 
 async function callZatca(endpoint: string, payload: string, token?: string | null) {
   const res = await fetch(endpoint, {
@@ -18,12 +19,17 @@ async function callZatca(endpoint: string, payload: string, token?: string | nul
   return { ok: res.ok, status: res.status, text }
 }
 
+function getZatcaEndpoint(jobType: "report" | "clear") {
+  if (jobType === "report") return process.env.ZATCA_REPORT_URL ?? process.env.ZATCA_ENDPOINT_URL
+  return process.env.ZATCA_CLEAR_URL ?? process.env.ZATCA_ENDPOINT_URL
+}
+
 export async function POST() {
   const jobs = await nextPendingJobs(5)
-  const endpoint = process.env.ZATCA_ENDPOINT_URL
+  const endpointBase = process.env.ZATCA_ENDPOINT_URL
   const token = process.env.ZATCA_API_TOKEN
 
-  if (!endpoint) {
+  if (!endpointBase && !process.env.ZATCA_REPORT_URL && !process.env.ZATCA_CLEAR_URL) {
     return NextResponse.json({ error: "ZATCA_ENDPOINT_URL missing" }, { status: 500 })
   }
 
@@ -55,11 +61,43 @@ export async function POST() {
       })
 
       const signedPayload = `${inv.xml_payload}\n<!-- Signature:${signature} -->`
+      const sdkValidation = await validateWithZatcaSdk(signedPayload)
+      if (!sdkValidation.ok) {
+        await markJobFailed(job.id, `SDK validation failed: ${(sdkValidation.errors ?? []).join("; ")}`)
+        continue
+      }
+      const endpoint = getZatcaEndpoint(job.job_type)
+      if (!endpoint) {
+        await markJobFailed(job.id, "ZATCA endpoint missing for job type")
+        continue
+      }
+
       const response = await callZatca(endpoint, signedPayload, token)
+      await markJobResult({
+        id: job.id,
+        responseStatus: response.status,
+        responseBody: response.text,
+      })
 
       if (!response.ok) {
         await markJobFailed(job.id, `ZATCA error ${response.status}`)
         continue
+      }
+
+      if (job.job_type === "report") {
+        await pool.query(
+          `UPDATE invoices SET status = 'reported', status_changed_at = NOW(), reported_at = NOW(),
+           zatca_status = 'reported', zatca_last_response = $1
+           WHERE id = $2`,
+          [response.text, inv.id]
+        )
+      } else if (job.job_type === "clear") {
+        await pool.query(
+          `UPDATE invoices SET status = 'cleared', status_changed_at = NOW(), cleared_at = NOW(),
+           zatca_status = 'cleared', zatca_last_response = $1
+           WHERE id = $2`,
+          [response.text, inv.id]
+        )
       }
 
       await markJobDone(job.id)

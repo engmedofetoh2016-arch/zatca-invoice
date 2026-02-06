@@ -44,3 +44,16 @@ export async function markJobDone(id: string) {
     [id]
   )
 }
+
+export async function markJobResult(input: {
+  id: string
+  responseStatus: number
+  responseBody: string
+}) {
+  await pool.query(
+    `UPDATE zatca_jobs
+     SET response_status = $1, response_body = $2, response_at = NOW(), updated_at = NOW()
+     WHERE id = $3`,
+    [input.responseStatus, input.responseBody, input.id]
+  )
+}

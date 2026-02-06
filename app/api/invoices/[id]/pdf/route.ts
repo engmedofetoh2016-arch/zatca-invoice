@@ -1,15 +1,16 @@
-﻿export const runtime = "nodejs"
+export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
+import path from "node:path"
+import { readFile } from "node:fs/promises"
 import { NextResponse } from "next/server"
-import { PDFDocument, StandardFonts } from "pdf-lib"
+import { chromium } from "playwright"
 import { pool } from "@/lib/db"
 import { zatcaQrDataUrl } from "@/lib/zatca"
 import { getCurrentUser, getCurrentBusinessId } from "@/lib/current"
 
-function b64ToUint8Array(base64: string) {
-  const bin = Buffer.from(base64, "base64")
-  return new Uint8Array(bin)
+function formatSarAr(amount: number) {
+  return new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR" }).format(amount)
 }
 
 export async function GET(
@@ -38,219 +39,126 @@ export async function GET(
     if (!inv) return NextResponse.json({ error: "Invoice not found" }, { status: 404 })
 
     const itemsRes = await pool.query(
-      `SELECT description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason FROM invoice_items WHERE invoice_id = $1 ORDER BY id`,
+      `SELECT description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason
+       FROM invoice_items WHERE invoice_id = $1 ORDER BY id`,
       [id]
     )
 
-    const pdfDoc = await PDFDocument.create()
+    const fontPath = path.join(process.cwd(), "public", "fonts", "Cairo-Regular.ttf")
+    const fontBase64 = (await readFile(fontPath)).toString("base64")
 
-    let qrImage: any = null
+    let qrDataUrl = ""
     try {
       const issueDate = new Date(inv.issue_date)
       const timestampISO = Number.isNaN(issueDate.getTime())
         ? new Date().toISOString()
         : issueDate.toISOString()
-      const qrDataUrl = await zatcaQrDataUrl({
+      qrDataUrl = await zatcaQrDataUrl({
         sellerName: String(inv.seller_name ?? ""),
         vatNumber: String(inv.seller_vat ?? ""),
         timestampISO,
         total: Number(inv.total ?? 0).toFixed(2),
         vatAmount: Number(inv.vat_amount ?? 0).toFixed(2),
       })
-      const qrPart = qrDataUrl.split(",")[1]
-      if (qrPart) {
-        const qrBytes = b64ToUint8Array(qrPart)
-        qrImage = await pdfDoc.embedPng(qrBytes)
-      }
     } catch (e) {
       console.error("QR ERROR:", e)
     }
 
-    const page = pdfDoc.addPage([595.28, 841.89])
-
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
-
-    let y = 800
-    const left = 50
-    const rightX = 545.28
-    const maxWidth = rightX - left
-
-    const sanitize = (text: string) => {
-      const raw = String(text ?? "")
-      const ascii = raw.replace(/[^\x20-\x7E]/g, "")
-      const trimmed = ascii.trim()
-      return trimmed.length > 0 ? trimmed : "-"
-    }
-
-    const measure = (text: string, size: number) => font.widthOfTextAtSize(sanitize(text), size)
-
-    const wrapText = (text: string, size: number, width: number) => {
-      const words = sanitize(text).split(/\s+/).filter(Boolean)
-      if (words.length === 0) return [""]
-      const lines: string[] = []
-      let line = ""
-      for (const w of words) {
-        const next = line ? `${line} ${w}` : w
-        if (measure(next, size) <= width) {
-          line = next
-        } else {
-          if (line) lines.push(line)
-          line = w
-        }
-      }
-      if (line) lines.push(line)
-      return lines
-    }
-
-    const drawLeftLine = (text: string, size = 12, xLeft = left) => {
-      page.drawText(sanitize(text), { x: xLeft, y, size, font })
-    }
-
-    const drawLeft = (text: string, size = 12, gap = 6) => {
-      drawLeftLine(text, size, left)
-      y -= size + gap
-    }
-
-    const drawLeftWrapped = (text: string, size = 12, gap = 6) => {
-      const lines = wrapText(text, size, maxWidth)
-      for (const line of lines) {
-        drawLeftLine(line, size, left)
-        y -= size + gap
-      }
-    }
-
-    const formatSar = (amount: number) =>
-      new Intl.NumberFormat("en-US", { style: "currency", currency: "SAR" }).format(amount)
-
-    const titleEn =
+    const titleAr =
       inv.invoice_type === "credit"
-        ? "Credit Note"
+        ? "إشعار دائن"
         : inv.invoice_type === "debit"
-        ? "Debit Note"
-        : "Tax Invoice"
+        ? "إشعار مدين"
+        : "فاتورة ضريبية"
 
-    drawLeft(titleEn, 16, 4)
-    y -= 6
+    const itemsHtml = itemsRes.rows
+      .map((it: any) => {
+        const ratePct = ((Number(it.vat_rate) || 0) * 100).toFixed(0)
+        return `
+          <div class="item">
+            <div class="item-name">${it.description ?? "-"}</div>
+            <div class="item-total">${formatSarAr(Number(it.line_total ?? 0))}</div>
+            <div class="item-meta">الكمية: ${Number(it.qty ?? 0).toFixed(2)} × السعر: ${Number(it.unit_price ?? 0).toFixed(2)}</div>
+            <div class="item-meta">VAT: ${ratePct}% | ${formatSarAr(Number(it.vat_amount ?? 0))}</div>
+          </div>
+        `
+      })
+      .join("")
 
-    const labelSize = 9
-    const valueSize = 10
-    const labelGap = 2
-    const valueGap = 4
-
-    drawLeft("Seller", labelSize, labelGap)
-    drawLeftWrapped(String(inv.seller_name ?? "-"), valueSize, valueGap)
-    drawLeft("VAT Number", labelSize, labelGap)
-    drawLeft(String(inv.seller_vat ?? "-"), valueSize, valueGap)
-    drawLeft("CR Number", labelSize, labelGap)
-    drawLeft(String(inv.seller_cr ?? "-"), valueSize, valueGap)
-    y -= 6
-
-    drawLeft("Invoice Number", labelSize, labelGap)
-    drawLeft(String(inv.invoice_number), valueSize, valueGap)
-    drawLeft("Date", labelSize, labelGap)
-    drawLeft(new Date(inv.issue_date).toLocaleString("en-US"), valueSize, valueGap)
-    if (inv.uuid) {
-      drawLeft("UUID", labelSize, labelGap)
-      drawLeftWrapped(String(inv.uuid), valueSize, valueGap)
-    }
-    if (inv.invoice_hash) {
-      drawLeft("Hash", labelSize, labelGap)
-      drawLeftWrapped(String(inv.invoice_hash), valueSize - 1, valueGap)
-    }
-    if (inv.original_invoice_id) {
-      drawLeft("Original Invoice", labelSize, labelGap)
-      drawLeftWrapped(String(inv.original_invoice_id), valueSize, valueGap)
-    }
-    if (inv.note_reason) {
-      drawLeft("Reason", labelSize, labelGap)
-      drawLeft(String(inv.note_reason), valueSize, valueGap)
-    }
-    y -= 6
-
-    drawLeft("Customer", labelSize, labelGap)
-    drawLeftWrapped(String(inv.customer_name || "-"), valueSize, valueGap)
-    drawLeft("Customer VAT", labelSize, labelGap)
-    drawLeft(String(inv.customer_vat || "-"), valueSize, valueGap)
-    y -= 8
-
-    drawLeft("Invoice Items", 13)
-    y -= 6
-
-    const tableLeft = left
-    const tableRight = rightX
-    const colVat = 70
-    const colTotal = 90
-    const colUnit = 80
-    const colQty = 60
-    const colItem = tableRight - tableLeft - (colVat + colTotal + colUnit + colQty)
-
-    const colLeftItem = tableLeft
-    const colLeftQty = colLeftItem + colItem
-    const colLeftUnit = colLeftQty + colQty
-    const colLeftTotal = colLeftUnit + colUnit
-    const colLeftVat = colLeftTotal + colTotal
-
-    const drawCellLeft = (text: string, size: number, colLeft: number) => {
-      page.drawText(sanitize(text), { x: colLeft, y, size, font })
-    }
-
-    // header
-    drawCellLeft("Item", 11, colLeftItem)
-    drawCellLeft("Qty", 11, colLeftQty)
-    drawCellLeft("Unit", 11, colLeftUnit)
-    drawCellLeft("Total", 11, colLeftTotal)
-    drawCellLeft("VAT", 11, colLeftVat)
-    y -= 16
-
-    for (const it of itemsRes.rows) {
-      const ratePct = ((Number(it.vat_rate) || 0) * 100).toFixed(0)
-      const desc = String(it.description ?? "-")
-      const descLines = wrapText(desc, 11, colItem)
-
-      // description (may wrap)
-      for (let i = 0; i < descLines.length; i++) {
-        const line = descLines[i]
-        drawCellLeft(line, 11, colLeftItem)
-        if (i < descLines.length - 1) {
-          y -= 14
-        }
+    const html = `
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: "Cairo";
+        src: url(data:font/ttf;base64,${fontBase64}) format("truetype");
+        font-weight: normal;
+        font-style: normal;
       }
+      * { box-sizing: border-box; }
+      body {
+        font-family: "Cairo", Arial, sans-serif;
+        margin: 40px;
+        color: #111;
+        font-size: 14px;
+      }
+      h1 { font-size: 20px; margin: 0 0 10px; }
+      .section-title { margin: 18px 0 6px; font-weight: 700; }
+      .label { color: #666; font-size: 12px; margin-top: 4px; }
+      .value { font-size: 14px; }
+      .divider { height: 1px; background: #eee; margin: 14px 0; }
+      .items { display: grid; gap: 10px; }
+      .item { border: 1px solid #f0f0f0; padding: 10px 12px; border-radius: 8px; }
+      .item-name { font-weight: 700; margin-bottom: 4px; }
+      .item-total { margin-bottom: 4px; }
+      .item-meta { color: #444; font-size: 12px; }
+      .totals { display: grid; gap: 6px; }
+      .row { display: flex; justify-content: space-between; }
+      .qr { margin-top: 16px; display: flex; justify-content: flex-start; }
+      .qr img { width: 140px; height: 140px; }
+    </style>
+  </head>
+  <body>
+    <h1>${titleAr}</h1>
 
-      // other columns on first line
-      const qtyText = Number(it.qty ?? 0).toFixed(2)
-      const unitText = Number(it.unit_price ?? 0).toFixed(2)
-      const totalText = Number(it.line_total ?? 0).toFixed(2)
-      const vatText = `${ratePct}%`
+    ${inv.payment_link ? `
+      <div class="label">رابط الدفع</div>
+      <div class="value">${inv.payment_link}</div>
+    ` : ""}
 
-      drawCellLeft(qtyText, 11, colLeftQty)
-      drawCellLeft(unitText, 11, colLeftUnit)
-      drawCellLeft(totalText, 11, colLeftTotal)
-      drawCellLeft(vatText, 11, colLeftVat)
+    <div class="section-title">العميل</div>
+    <div class="value">${inv.customer_name || "-"}</div>
+    <div class="label">الرقم الضريبي</div>
+    <div class="value">${inv.customer_vat || "-"}</div>
 
-      y -= 16
-      if (y < 160) break
-    }
+    <div class="section-title">تفاصيل تقنية</div>
+    <div class="totals">
+      <div class="row"><span>الإجمالي قبل الضريبة</span><span>${formatSarAr(Number(inv.subtotal ?? 0))}</span></div>
+      <div class="row"><span>ضريبة القيمة المضافة</span><span>${formatSarAr(Number(inv.vat_amount ?? 0))}</span></div>
+      <div class="row"><strong>الإجمالي</strong><strong>${formatSarAr(Number(inv.total ?? 0))}</strong></div>
+    </div>
 
-    y -= 10
-    drawLeft("Subtotal", 11)
-    drawLeft(formatSar(Number(inv.subtotal)), 12)
-    drawLeft("VAT", 11)
-    drawLeft(formatSar(Number(inv.vat_amount)), 12)
-    drawLeft("Total", 12)
-    drawLeft(formatSar(Number(inv.total)), 14)
-    if (inv.payment_link) {
-      drawLeft("Payment Link", 10)
-      drawLeft(String(inv.payment_link), 10)
-    }
+    <div class="section-title">بنود الفاتورة</div>
+    <div class="items">
+      ${itemsHtml || `<div class="value">لا توجد بنود</div>`}
+    </div>
 
-    if (qrImage) {
-      page.drawImage(qrImage, { x: 595.28 - 50 - 140, y: 60, width: 140, height: 140 })
-      page.drawText("ZATCA QR", { x: 595.28 - 50 - 140, y: 45, size: 10, font })
-    }
+    ${qrDataUrl ? `
+      <div class="qr"><img src="${qrDataUrl}" alt="ZATCA QR"></div>
+    ` : ""}
+  </body>
+</html>
+    `
 
-    const pdfBytes = await pdfDoc.save()
+    const browser = await chromium.launch()
+    const page = await browser.newPage()
+    await page.setContent(html, { waitUntil: "networkidle" })
+    const pdf = await page.pdf({ format: "A4", printBackground: true })
+    await browser.close()
 
-    return new Response(Buffer.from(pdfBytes), {
+    return new Response(pdf, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${inv.invoice_number}.pdf"`,
