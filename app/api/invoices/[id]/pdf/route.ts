@@ -75,10 +75,17 @@ export async function GET(
     const rightX = 545.28
     const maxWidth = rightX - left
 
-    const measure = (text: string, size: number) => font.widthOfTextAtSize(text, size)
+    const sanitize = (text: string) => {
+      const raw = String(text ?? "")
+      const ascii = raw.replace(/[^\x20-\x7E]/g, "")
+      const trimmed = ascii.trim()
+      return trimmed.length > 0 ? trimmed : "-"
+    }
+
+    const measure = (text: string, size: number) => font.widthOfTextAtSize(sanitize(text), size)
 
     const wrapText = (text: string, size: number, width: number) => {
-      const words = String(text ?? "").split(/\s+/).filter(Boolean)
+      const words = sanitize(text).split(/\s+/).filter(Boolean)
       if (words.length === 0) return [""]
       const lines: string[] = []
       let line = ""
@@ -96,7 +103,7 @@ export async function GET(
     }
 
     const drawLeftLine = (text: string, size = 12, xLeft = left) => {
-      page.drawText(text, { x: xLeft, y, size, font })
+      page.drawText(sanitize(text), { x: xLeft, y, size, font })
     }
 
     const drawLeft = (text: string, size = 12, gap = 6) => {
@@ -184,7 +191,7 @@ export async function GET(
     const colLeftVat = colLeftTotal + colTotal
 
     const drawCellLeft = (text: string, size: number, colLeft: number) => {
-      page.drawText(text, { x: colLeft, y, size, font })
+      page.drawText(sanitize(text), { x: colLeft, y, size, font })
     }
 
     // header
