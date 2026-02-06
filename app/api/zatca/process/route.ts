@@ -63,7 +63,8 @@ export async function POST() {
       const signedPayload = `${inv.xml_payload}\n<!-- Signature:${signature} -->`
       const sdkValidation = await validateWithZatcaSdk(signedPayload)
       if (!sdkValidation.ok) {
-        await markJobFailed(job.id, `SDK validation failed: ${(sdkValidation.errors ?? []).join("; ")}`)
+        const errs = "errors" in sdkValidation ? (sdkValidation.errors ?? []) : []
+        await markJobFailed(job.id, `SDK validation failed: ${errs.join("; ")}`)
         continue
       }
       const endpoint = getZatcaEndpoint(job.job_type)
