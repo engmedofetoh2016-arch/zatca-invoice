@@ -66,8 +66,7 @@ export async function GET() {
     const fontPath = path.join(process.cwd(), "public", "fonts", "Cairo-Regular.ttf")
     const fontBase64 = (await readFile(fontPath)).toString("base64")
 
-    const formatDate = (d: Date) =>
-      d.toISOString().slice(0, 10)
+    const formatDate = (d: Date) => d.toISOString().slice(0, 10)
 
     const statusRows = ["issued", "reported", "cleared", "rejected", "draft"]
       .map((s) => `<div class="row"><span>${s}</span><span>${statusMap.get(s) ?? 0}</span></div>`)
@@ -164,7 +163,7 @@ export async function GET() {
     const pdf = await page.pdf({ format: "A4", printBackground: true })
     await browser.close()
 
-    return new Response(pdf, {
+    return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": "attachment; filename=reports.pdf",
