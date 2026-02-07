@@ -86,9 +86,9 @@ export async function POST(req: Request) {
       const lineTotal = +(it.qty * it.unitPrice).toFixed(2)
       const lineVat = +(lineTotal * (it.vatRate ?? 0)).toFixed(2)
       await client.query(
-        `INSERT INTO invoice_items (invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason, unit_code, vat_category)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [invoiceId, it.description, it.qty, it.unitPrice, lineTotal, it.vatRate ?? 0, lineVat, it.vatExemptReason ?? null, it.unitCode ?? null, it.vatCategory ?? null]
+        `INSERT INTO invoice_items (invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason, unit_code, vat_category, product_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [invoiceId, it.description, it.qty, it.unitPrice, lineTotal, it.vatRate ?? 0, lineVat, it.vatExemptReason ?? null, it.unitCode ?? null, it.vatCategory ?? null, it.productId ?? null]
       )
     }
 

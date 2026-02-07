@@ -20,7 +20,7 @@ export async function GET() {
       [business.id]
     ),
     pool.query(
-      `SELECT invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason, unit_code, vat_category
+      `SELECT invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason, unit_code, vat_category, product_id
        FROM invoice_items
        WHERE invoice_id IN (SELECT id FROM invoices WHERE business_id = $1)
        ORDER BY invoice_id`,

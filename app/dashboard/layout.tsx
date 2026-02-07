@@ -33,14 +33,6 @@ export default async function DashboardLayout({
           </div>
 
           <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-            <div className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-xs text-gray-600">
-              <span className="text-[10px]">بحث</span>
-              <input
-                className="w-44 bg-transparent text-xs outline-none placeholder:text-gray-400"
-                placeholder="بحث عن رقم فاتورة / عميل"
-              />
-            </div>
-
             <Link
               href="/dashboard/invoices/new"
               className="rounded-lg bg-black px-4 py-2 text-xs font-semibold text-white hover:opacity-90"

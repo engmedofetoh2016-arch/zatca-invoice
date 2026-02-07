@@ -12,6 +12,7 @@ type Item = {
   vatExemptReason?: string
   unitCode?: string | null
   vatCategory?: string | null
+  productId?: string | null
 }
 
 type InvoiceType = "invoice" | "credit" | "debit"
@@ -38,10 +39,28 @@ export default function NewInvoicePage() {
   const [customerOpen, setCustomerOpen] = useState(false)
   const [customerLoading, setCustomerLoading] = useState(false)
   const [units, setUnits] = useState<Array<{ code: string; name_en: string; name_ar: string }>>([])
+  const [products, setProducts] = useState<Array<{
+    id: string
+    name: string
+    sku?: string | null
+    unit_code?: string | null
+    default_unit_price: number
+    vat_category?: string | null
+    vat_rate: number
+  }>>([])
   const [newUnitCode, setNewUnitCode] = useState("")
   const [newUnitNameAr, setNewUnitNameAr] = useState("")
   const [newUnitNameEn, setNewUnitNameEn] = useState("")
   const [newUnitLoading, setNewUnitLoading] = useState(false)
+  const [newProductName, setNewProductName] = useState("")
+  const [newProductSku, setNewProductSku] = useState("")
+  const [newProductUnitCode, setNewProductUnitCode] = useState("")
+  const [newProductPrice, setNewProductPrice] = useState<number>(0)
+  const [newProductVatCategory, setNewProductVatCategory] = useState("standard")
+  const [newProductVatRate, setNewProductVatRate] = useState<number>(0.15)
+  const [newProductLoading, setNewProductLoading] = useState(false)
+  const [showUnitsModal, setShowUnitsModal] = useState(false)
+  const [showProductsModal, setShowProductsModal] = useState(false)
   const [items, setItems] = useState<Item[]>([
     { description: "", qty: 1, unitPrice: 0, vatRate: 0.15, vatCategory: "standard" },
   ])
@@ -96,9 +115,17 @@ export default function NewInvoicePage() {
     setUnits(data?.units ?? [])
   }
 
+  async function loadProducts(query = "") {
+    const res = await fetch(`/api/products?q=${encodeURIComponent(query)}`)
+    if (!res.ok) return
+    const data = await res.json()
+    setProducts(data?.products ?? [])
+  }
+
   useEffect(() => {
     let cancelled = false
     loadUnits()
+    loadProducts()
     return () => {
       cancelled = true
     }
@@ -127,6 +154,7 @@ export default function NewInvoicePage() {
         vatExemptReason: it.vatExemptReason ? String(it.vatExemptReason).trim() : undefined,
         unitCode: it.unitCode ? String(it.unitCode).trim() : undefined,
         vatCategory: it.vatCategory ? String(it.vatCategory).trim() : undefined,
+        productId: it.productId ? String(it.productId).trim() : undefined,
       }))
       .filter((it) => it.description)
 
@@ -285,16 +313,43 @@ export default function NewInvoicePage() {
         <div className="font-semibold">بنود الفاتورة</div>
         {items.map((it, i) => (
           <div key={i} className="grid grid-cols-12 gap-2">
+            <select
+              className="col-span-12 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm md:col-span-4"
+              value={it.productId ?? ""}
+              onChange={(e) => {
+                const id = e.target.value || null
+                const product = products.find((p) => p.id === id)
+                if (!product) {
+                  updateItem(i, { productId: null })
+                  return
+                }
+                updateItem(i, {
+                  productId: product.id,
+                  description: product.name,
+                  unitCode: product.unit_code ?? null,
+                  unitPrice: Number(product.default_unit_price ?? 0),
+                  vatCategory: product.vat_category ?? "standard",
+                  vatRate: Number(product.vat_rate ?? 0.15),
+                })
+              }}
+            >
+              <option value="">اختر منتج (اختياري)</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.sku ? ` (${p.sku})` : ""}
+                </option>
+              ))}
+            </select>
             <input
               className="col-span-12 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-4"
-              placeholder="الوصف"
+              placeholder="الوصف / اسم الصنف"
               value={it.description}
               onChange={e=>updateItem(i, { description: e.target.value })}
             />
             <input
               className="col-span-6 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-2"
               type="number"
-              placeholder="الكمية"
+              placeholder="الكمية (Qty)"
               value={it.qty}
               onChange={e=>updateItem(i, { qty: Number(e.target.value) })}
             />
@@ -310,7 +365,7 @@ export default function NewInvoicePage() {
               value={it.unitCode ?? ""}
               onChange={(e) => updateItem(i, { unitCode: e.target.value || null })}
             >
-              <option value="">الوحدة</option>
+              <option value="">الوحدة (Unit)</option>
               {units.map((u) => (
                 <option key={u.code} value={u.code}>
                   {u.name_ar} ({u.code})
@@ -321,7 +376,7 @@ export default function NewInvoicePage() {
               className="col-span-6 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-2"
               type="number"
               step="0.01"
-              placeholder="VAT %"
+              placeholder="نسبة الضريبة (VAT %)"
               value={(Number(it.vatRate) * 100).toString()}
               onChange={e=>updateItem(i, { vatRate: Number(e.target.value) / 100 })}
             />
@@ -336,10 +391,10 @@ export default function NewInvoicePage() {
                 })
               }}
             >
-              <option value="standard">Standard</option>
-              <option value="zero">Zero</option>
-              <option value="exempt">Exempt</option>
-              <option value="outofscope">Out of scope</option>
+              <option value="standard">Standard (قياسي)</option>
+              <option value="zero">Zero (صفرية)</option>
+              <option value="exempt">Exempt (معفى)</option>
+              <option value="outofscope">Out of scope (خارج النطاق)</option>
             </select>
             <button className="col-span-6 rounded-lg border px-3 text-xs font-semibold hover:bg-gray-50 md:col-span-1" onClick={()=>removeItem(i)} type="button">حذف</button>
             <input
@@ -355,57 +410,21 @@ export default function NewInvoicePage() {
         </button>
       </div>
 
-      <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-3">
-        <div className="font-semibold">إضافة وحدة جديدة</div>
-        <div className="grid grid-cols-12 gap-2">
-          <input
-            className="col-span-12 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-3"
-            placeholder="رمز الوحدة (مثال EA)"
-            value={newUnitCode}
-            onChange={(e) => setNewUnitCode(e.target.value.toUpperCase())}
-          />
-          <input
-            className="col-span-12 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-4"
-            placeholder="الاسم بالعربية"
-            value={newUnitNameAr}
-            onChange={(e) => setNewUnitNameAr(e.target.value)}
-          />
-          <input
-            className="col-span-12 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-4"
-            placeholder="الاسم بالإنجليزية"
-            value={newUnitNameEn}
-            onChange={(e) => setNewUnitNameEn(e.target.value)}
-          />
-          <button
-            type="button"
-            className="col-span-12 rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white hover:opacity-90 md:col-span-1"
-            disabled={newUnitLoading}
-            onClick={async () => {
-              if (!newUnitCode.trim() || !newUnitNameAr.trim() || !newUnitNameEn.trim()) return
-              setNewUnitLoading(true)
-              const res = await fetch("/api/units", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "x-csrf-token": getCsrfToken(),
-                },
-                body: JSON.stringify({
-                  code: newUnitCode.trim().toUpperCase(),
-                  name_ar: newUnitNameAr.trim(),
-                  name_en: newUnitNameEn.trim(),
-                }),
-              })
-              setNewUnitLoading(false)
-              if (!res.ok) return alert(await res.text())
-              setNewUnitCode("")
-              setNewUnitNameAr("")
-              setNewUnitNameEn("")
-              await loadUnits()
-            }}
-          >
-            {newUnitLoading ? "..." : "حفظ"}
-          </button>
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-gray-50"
+          onClick={() => setShowUnitsModal(true)}
+        >
+          إدارة الوحدات
+        </button>
+        <button
+          type="button"
+          className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-gray-50"
+          onClick={() => setShowProductsModal(true)}
+        >
+          إدارة المنتجات
+        </button>
       </div>
 
       <div className="rounded-2xl border bg-white p-5 shadow-sm space-y-1 text-sm">
@@ -430,6 +449,167 @@ export default function NewInvoicePage() {
           حفظ كمسودة
         </button>
       </div>
+
+      {showUnitsModal && (
+        <div className="fixed inset-0 z-40 bg-black/40 p-4">
+          <div className="mx-auto max-w-xl rounded-2xl bg-white p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="font-semibold">إدارة الوحدات</div>
+              <button className="text-sm text-gray-500" onClick={() => setShowUnitsModal(false)}>إغلاق</button>
+            </div>
+            <div className="mt-4 grid grid-cols-12 gap-2">
+              <input
+                className="col-span-12 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-3"
+                placeholder="رمز الوحدة (EA)"
+                value={newUnitCode}
+                onChange={(e) => setNewUnitCode(e.target.value.toUpperCase())}
+              />
+              <input
+                className="col-span-12 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-4"
+                placeholder="الاسم بالعربية"
+                value={newUnitNameAr}
+                onChange={(e) => setNewUnitNameAr(e.target.value)}
+              />
+              <input
+                className="col-span-12 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-4"
+                placeholder="الاسم بالإنجليزية"
+                value={newUnitNameEn}
+                onChange={(e) => setNewUnitNameEn(e.target.value)}
+              />
+              <button
+                type="button"
+                className="col-span-12 rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white hover:opacity-90 md:col-span-1"
+                disabled={newUnitLoading}
+                onClick={async () => {
+                  if (!newUnitCode.trim() || !newUnitNameAr.trim() || !newUnitNameEn.trim()) return
+                  setNewUnitLoading(true)
+                  const res = await fetch("/api/units", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "x-csrf-token": getCsrfToken(),
+                    },
+                    body: JSON.stringify({
+                      code: newUnitCode.trim().toUpperCase(),
+                      name_ar: newUnitNameAr.trim(),
+                      name_en: newUnitNameEn.trim(),
+                    }),
+                  })
+                  setNewUnitLoading(false)
+                  if (!res.ok) return alert(await res.text())
+                  setNewUnitCode("")
+                  setNewUnitNameAr("")
+                  setNewUnitNameEn("")
+                  await loadUnits()
+                }}
+              >
+                {newUnitLoading ? "..." : "حفظ"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showProductsModal && (
+        <div className="fixed inset-0 z-40 bg-black/40 p-4">
+          <div className="mx-auto max-w-2xl rounded-2xl bg-white p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="font-semibold">إدارة المنتجات</div>
+              <button className="text-sm text-gray-500" onClick={() => setShowProductsModal(false)}>إغلاق</button>
+            </div>
+            <div className="mt-4 grid grid-cols-12 gap-2">
+              <input
+                className="col-span-12 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-4"
+                placeholder="اسم المنتج"
+                value={newProductName}
+                onChange={(e) => setNewProductName(e.target.value)}
+              />
+              <input
+                className="col-span-12 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-3"
+                placeholder="SKU (اختياري)"
+                value={newProductSku}
+                onChange={(e) => setNewProductSku(e.target.value)}
+              />
+              <select
+                className="col-span-6 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm md:col-span-2"
+                value={newProductUnitCode}
+                onChange={(e) => setNewProductUnitCode(e.target.value)}
+              >
+                <option value="">الوحدة</option>
+                {units.map((u) => (
+                  <option key={u.code} value={u.code}>
+                    {u.name_ar} ({u.code})
+                  </option>
+                ))}
+              </select>
+              <input
+                className="col-span-6 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-2"
+                type="number"
+                placeholder="سعر افتراضي"
+                value={newProductPrice}
+                onChange={(e) => setNewProductPrice(Number(e.target.value))}
+              />
+              <select
+                className="col-span-6 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm md:col-span-2"
+                value={newProductVatCategory}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setNewProductVatCategory(next)
+                  setNewProductVatRate(next === "standard" ? 0.15 : 0)
+                }}
+              >
+                <option value="standard">Standard</option>
+                <option value="zero">Zero</option>
+                <option value="exempt">Exempt</option>
+                <option value="outofscope">Out of scope</option>
+              </select>
+              <input
+                className="col-span-6 rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-2"
+                type="number"
+                step="0.01"
+                placeholder="VAT %"
+                value={(Number(newProductVatRate) * 100).toString()}
+                onChange={(e) => setNewProductVatRate(Number(e.target.value) / 100)}
+              />
+              <button
+                type="button"
+                className="col-span-12 rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white hover:opacity-90 md:col-span-1"
+                disabled={newProductLoading}
+                onClick={async () => {
+                  if (!newProductName.trim()) return
+                  setNewProductLoading(true)
+                  const res = await fetch("/api/products", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "x-csrf-token": getCsrfToken(),
+                    },
+                    body: JSON.stringify({
+                      name: newProductName.trim(),
+                      sku: newProductSku.trim() || null,
+                      unit_code: newProductUnitCode || null,
+                      default_unit_price: Number(newProductPrice || 0),
+                      vat_category: newProductVatCategory,
+                      vat_rate: Number(newProductVatRate || 0),
+                    }),
+                  })
+                  setNewProductLoading(false)
+                  if (!res.ok) return alert(await res.text())
+                  setNewProductName("")
+                  setNewProductSku("")
+                  setNewProductUnitCode("")
+                  setNewProductPrice(0)
+                  setNewProductVatCategory("standard")
+                  setNewProductVatRate(0.15)
+                  await loadProducts()
+                }}
+              >
+                {newProductLoading ? "..." : "حفظ"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

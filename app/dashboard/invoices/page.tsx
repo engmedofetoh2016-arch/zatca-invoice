@@ -8,6 +8,7 @@ import { verifyToken } from "@/lib/auth"
 import { getBusinessByUserId } from "@/lib/business"
 import { pool } from "@/lib/db"
 import InvoiceImportExport from "./InvoiceImportExport"
+import FiltersClient from "./FiltersClient"
 
 function formatSar(amount: number) {
   return new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR" }).format(amount)
@@ -75,7 +76,7 @@ function typeClass(type: string) {
 export default async function InvoicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; date?: string; type?: string; from?: string; to?: string; page?: string }>
+  searchParams: Promise<{ status?: string; date?: string; type?: string; from?: string; to?: string; page?: string; q?: string }>
 }) {
   const sp = await searchParams
   const cookieStore = await cookies()
@@ -91,6 +92,7 @@ export default async function InvoicesPage({
   const date = sp.date ?? "all"
   const from = sp.from ?? ""
   const to = sp.to ?? ""
+  const q = sp.q ?? ""
   const page = Math.max(1, Number(sp.page ?? 1) || 1)
   const pageSize = 12
 
@@ -105,6 +107,11 @@ export default async function InvoicesPage({
   if (type !== "all") {
     values.push(type)
     conditions.push(`invoice_type = $${values.length}`)
+  }
+
+  if (q) {
+    values.push(`%${q}%`)
+    conditions.push(`(invoice_number ILIKE $${values.length} OR customer_name ILIKE $${values.length})`)
   }
 
   const now = new Date()
@@ -173,53 +180,9 @@ export default async function InvoicesPage({
         </div>
       </div>
 
-      <form className="rounded-2xl border bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
-          <div className="flex items-center gap-2">
-            <span>الحالة:</span>
-            <select name="status" defaultValue={status} className="rounded-lg border border-gray-200 bg-white px-2 py-1">
-              <option value="all">الكل</option>
-              <option value="issued">صادرة</option>
-              <option value="reported">مبلّغ عنها</option>
-              <option value="cleared">مصفّاة</option>
-              <option value="rejected">مرفوضة</option>
-              <option value="draft">مسودة</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span>التاريخ:</span>
-            <select name="date" defaultValue={date} className="rounded-lg border border-gray-200 bg-white px-2 py-1">
-              <option value="all">الكل</option>
-              <option value="month">هذا الشهر</option>
-              <option value="last7">آخر 7 أيام</option>
-              <option value="custom">مخصص</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span>النوع:</span>
-            <select name="type" defaultValue={type} className="rounded-lg border border-gray-200 bg-white px-2 py-1">
-              <option value="all">الكل</option>
-              <option value="invoice">ضريبية</option>
-              <option value="credit">إشعار دائن</option>
-              <option value="debit">إشعار مدين</option>
-            </select>
-          </div>
-
-          {date === "custom" && (
-            <div className="flex items-center gap-2">
-              <input name="from" defaultValue={from} type="date" className="rounded-lg border border-gray-200 bg-white px-2 py-1" />
-              <span>—</span>
-              <input name="to" defaultValue={to} type="date" className="rounded-lg border border-gray-200 bg-white px-2 py-1" />
-            </div>
-          )}
-
-          <button className="rounded-lg bg-black px-3 py-1 text-xs font-semibold text-white hover:opacity-90">
-            تطبيق الفلاتر
-          </button>
-        </div>
-      </form>
+      <div className="rounded-2xl border bg-white p-4 shadow-sm">
+        <FiltersClient />
+      </div>
 
       {invoices.length === 0 ? (
         <div className="rounded-2xl border bg-white p-10 text-center text-gray-600">
@@ -287,7 +250,7 @@ export default async function InvoicesPage({
             </div>
             <div className="flex items-center gap-2">
               <Link
-                href={`/dashboard/invoices?status=${status}&date=${date}&type=${type}&from=${from}&to=${to}&page=${Math.max(1, safePage - 1)}`}
+                href={`/dashboard/invoices?status=${status}&date=${date}&type=${type}&from=${from}&to=${to}&q=${encodeURIComponent(q)}&page=${Math.max(1, safePage - 1)}`}
                 className={`rounded-lg border px-3 py-2 text-xs font-semibold ${safePage === 1 ? "pointer-events-none opacity-50" : "hover:bg-gray-50"}`}
               >
                 السابق
@@ -295,14 +258,14 @@ export default async function InvoicesPage({
               {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map((p) => (
                 <Link
                   key={p}
-                  href={`/dashboard/invoices?status=${status}&date=${date}&type=${type}&from=${from}&to=${to}&page=${p}`}
+                  href={`/dashboard/invoices?status=${status}&date=${date}&type=${type}&from=${from}&to=${to}&q=${encodeURIComponent(q)}&page=${p}`}
                   className={`rounded-lg border px-3 py-2 text-xs font-semibold ${p === safePage ? "bg-black text-white" : "hover:bg-gray-50"}`}
                 >
                   {p}
                 </Link>
               ))}
               <Link
-                href={`/dashboard/invoices?status=${status}&date=${date}&type=${type}&from=${from}&to=${to}&page=${Math.min(totalPages, safePage + 1)}`}
+                href={`/dashboard/invoices?status=${status}&date=${date}&type=${type}&from=${from}&to=${to}&q=${encodeURIComponent(q)}&page=${Math.min(totalPages, safePage + 1)}`}
                 className={`rounded-lg border px-3 py-2 text-xs font-semibold ${safePage >= totalPages ? "pointer-events-none opacity-50" : "hover:bg-gray-50"}`}
               >
                 التالي

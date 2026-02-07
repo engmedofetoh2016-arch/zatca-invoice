@@ -216,9 +216,9 @@ export async function POST(req: Request) {
 
       for (const it of computed) {
         await client.query(
-          `INSERT INTO invoice_items (invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason, unit_code, vat_category)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-          [invoiceId, it.description, it.qty, it.unitPrice, it.lineTotal, it.vatRate ?? 0.15, +(it.lineTotal * (it.vatRate ?? 0)).toFixed(2), it.vatExemptReason, it.unitCode, it.vatCategory]
+          `INSERT INTO invoice_items (invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason, unit_code, vat_category, product_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          [invoiceId, it.description, it.qty, it.unitPrice, it.lineTotal, it.vatRate ?? 0.15, +(it.lineTotal * (it.vatRate ?? 0)).toFixed(2), it.vatExemptReason, it.unitCode, it.vatCategory, null]
         )
       }
 

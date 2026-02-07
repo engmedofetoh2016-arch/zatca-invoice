@@ -6,6 +6,7 @@ type ItemInput = {
   vatExemptReason?: unknown
   unitCode?: unknown
   vatCategory?: unknown
+  productId?: unknown
 }
 
 const allowedVatCategories = new Set(["standard", "zero", "exempt", "outofscope"])
@@ -49,6 +50,7 @@ export function validateInvoiceInput(body: {
       const unitCode = unitCodeRaw && unitCodeRaw.length > 10 ? unitCodeRaw.slice(0, 10) : unitCodeRaw
       const vatCategoryRaw = it.vatCategory ? String(it.vatCategory).trim().toLowerCase() : null
       const vatCategory = vatCategoryRaw && allowedVatCategories.has(vatCategoryRaw) ? vatCategoryRaw : null
+      const productId = it.productId ? String(it.productId).trim() : null
       const lineErrors: string[] = []
 
       if (!description) lineErrors.push("description is required")
@@ -70,6 +72,7 @@ export function validateInvoiceInput(body: {
         vatExemptReason,
         unitCode,
         vatCategory,
+        productId,
         lineErrors,
       }
     })
@@ -100,6 +103,7 @@ export function validateInvoiceInput(body: {
       vatExemptReason: it.vatExemptReason,
       unitCode: it.unitCode,
       vatCategory: it.vatCategory,
+      productId: it.productId,
     })),
   }
 }

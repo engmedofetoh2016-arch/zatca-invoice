@@ -17,6 +17,7 @@ type Item = {
   vatExemptReason?: string | null
   unitCode?: string | null
   vatCategory?: string | null
+  productId?: string | null
 }
 
 export async function POST(req: Request) {
@@ -182,11 +183,12 @@ export async function POST(req: Request) {
         const vatExemptReason = it.vatExemptReason ? String(it.vatExemptReason) : null
         const unitCode = it.unitCode ? String(it.unitCode) : null
         const vatCategory = it.vatCategory ? String(it.vatCategory) : null
+        const productId = it.productId ? String(it.productId) : null
 
         await client.query(
-          `INSERT INTO invoice_items (invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason, unit_code, vat_category)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [invoiceId, description, qty, unitPrice, lineTotal, vatRate, vatAmount, vatExemptReason, unitCode, vatCategory]
+          `INSERT INTO invoice_items (invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason, unit_code, vat_category, product_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [invoiceId, description, qty, unitPrice, lineTotal, vatRate, vatAmount, vatExemptReason, unitCode, vatCategory, productId]
         )
       }
 
