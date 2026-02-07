@@ -43,6 +43,16 @@ function normalizeHeader(h: string) {
     "سبب الاعفاء": "item_vat_exempt_reason",
     "سبب_الاعفاء": "item_vat_exempt_reason",
     "vat exempt reason": "item_vat_exempt_reason",
+    "unit": "item_unit_code",
+    "unit code": "item_unit_code",
+    "unit_code": "item_unit_code",
+    "item unit": "item_unit_code",
+    "item_unit": "item_unit_code",
+    "item_unit_code": "item_unit_code",
+    "vat category": "item_vat_category",
+    "vat_category": "item_vat_category",
+    "item vat category": "item_vat_category",
+    "item_vat_category": "item_vat_category",
     "invoice type": "invoice_type",
     "invoice_type": "invoice_type",
     "نوع الفاتورة": "invoice_type",
@@ -173,8 +183,10 @@ export async function POST(req: Request) {
             const unitPrice = Number(it.item_unit_price ?? 0)
             const vatRate = it.item_vat_rate ? Number(it.item_vat_rate) : 0.15
             const vatExemptReason = it.item_vat_exempt_reason ? String(it.item_vat_exempt_reason).trim() : null
+            const unitCode = it.item_unit_code ? String(it.item_unit_code).trim() : null
+            const vatCategory = it.item_vat_category ? String(it.item_vat_category).trim().toLowerCase() : null
             const lineTotal = +(qty * unitPrice).toFixed(2)
-            return { description, qty, unitPrice, vatRate, vatExemptReason, lineTotal }
+            return { description, qty, unitPrice, vatRate, vatExemptReason, unitCode, vatCategory, lineTotal }
           }).filter((it) => it.description && it.qty > 0)
         : []
 
@@ -204,9 +216,9 @@ export async function POST(req: Request) {
 
       for (const it of computed) {
         await client.query(
-          `INSERT INTO invoice_items (invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-          [invoiceId, it.description, it.qty, it.unitPrice, it.lineTotal, it.vatRate ?? 0.15, +(it.lineTotal * (it.vatRate ?? 0)).toFixed(2), it.vatExemptReason]
+          `INSERT INTO invoice_items (invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason, unit_code, vat_category)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+          [invoiceId, it.description, it.qty, it.unitPrice, it.lineTotal, it.vatRate ?? 0.15, +(it.lineTotal * (it.vatRate ?? 0)).toFixed(2), it.vatExemptReason, it.unitCode, it.vatCategory]
         )
       }
 

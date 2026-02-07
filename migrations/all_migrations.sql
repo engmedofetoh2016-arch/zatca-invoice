@@ -243,14 +243,11 @@ CREATE TABLE IF NOT EXISTS zatca_settings (
 );
 
 -- 012_zatca_phase2.sql
-ALTER TABLE zatca_jobs
-  ADD COLUMN IF NOT EXISTS response_status INT NULL;
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS reported_at TIMESTAMPTZ NULL;
 
-ALTER TABLE zatca_jobs
-  ADD COLUMN IF NOT EXISTS response_body TEXT NULL;
-
-ALTER TABLE zatca_jobs
-  ADD COLUMN IF NOT EXISTS response_at TIMESTAMPTZ NULL;
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS cleared_at TIMESTAMPTZ NULL;
 
 ALTER TABLE invoices
   ADD COLUMN IF NOT EXISTS zatca_status TEXT NULL;
@@ -258,8 +255,37 @@ ALTER TABLE invoices
 ALTER TABLE invoices
   ADD COLUMN IF NOT EXISTS zatca_last_response TEXT NULL;
 
-ALTER TABLE invoices
-  ADD COLUMN IF NOT EXISTS reported_at TIMESTAMPTZ NULL;
+ALTER TABLE zatca_jobs
+  ADD COLUMN IF NOT EXISTS response_status INTEGER NULL;
 
-ALTER TABLE invoices
-  ADD COLUMN IF NOT EXISTS cleared_at TIMESTAMPTZ NULL;
+ALTER TABLE zatca_jobs
+  ADD COLUMN IF NOT EXISTS response_body TEXT NULL;
+
+ALTER TABLE zatca_jobs
+  ADD COLUMN IF NOT EXISTS response_at TIMESTAMPTZ NULL;
+
+-- 013_units.sql
+CREATE TABLE IF NOT EXISTS units (
+  code TEXT PRIMARY KEY,
+  name_en TEXT NOT NULL,
+  name_ar TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO units (code, name_en, name_ar) VALUES
+  ('EA', 'Each', 'قطعة'),
+  ('KG', 'Kilogram', 'كيلوجرام'),
+  ('LTR', 'Liter', 'لتر'),
+  ('HUR', 'Hour', 'ساعة'),
+  ('MTR', 'Meter', 'متر')
+ON CONFLICT (code) DO NOTHING;
+
+ALTER TABLE invoice_items
+  ADD COLUMN IF NOT EXISTS unit_code TEXT NULL,
+  ADD CONSTRAINT invoice_items_unit_code_fkey
+    FOREIGN KEY (unit_code) REFERENCES units(code)
+    ON UPDATE NO ACTION ON DELETE SET NULL;
+
+-- 014_vat_category.sql
+ALTER TABLE invoice_items
+  ADD COLUMN IF NOT EXISTS vat_category TEXT NULL;

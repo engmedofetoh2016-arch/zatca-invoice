@@ -118,7 +118,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   }
 
   const itemsRes = await pool.query(
-    `SELECT id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason
+    `SELECT id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason, unit_code, vat_category
      FROM invoice_items
      WHERE invoice_id = $1
      ORDER BY id ASC`,
@@ -218,7 +218,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   <div className="font-semibold">{formatSar(it.line_total)}</div>
                 </div>
                 <div className="text-gray-500">الكمية: {it.qty} × السعر: {it.unit_price}</div>
+                {it.unit_code && <div className="text-gray-500">الوحدة: {it.unit_code}</div>}
                 <div className="text-gray-500">VAT: {(Number(it.vat_rate) * 100).toFixed(0)}% | {formatSar(it.vat_amount)}</div>
+                {it.vat_category && <div className="text-gray-500">تصنيف الضريبة: {it.vat_category}</div>}
                 {it.vat_exempt_reason && (
                   <div className="text-gray-500">سبب الإعفاء: {it.vat_exempt_reason}</div>
                 )}

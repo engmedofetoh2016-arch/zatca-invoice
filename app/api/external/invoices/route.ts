@@ -54,6 +54,8 @@ export async function POST(req: Request) {
       lineTotal: +(it.qty * it.unitPrice).toFixed(2),
       vatRate: it.vatRate ?? 0,
       vatAmount: +((it.qty * it.unitPrice) * (it.vatRate ?? 0)).toFixed(2),
+      unitCode: it.unitCode ?? null,
+      vatCategory: it.vatCategory ?? null,
     })),
   })
   const invoiceHash = hashInvoiceXml(ubl.xml)
@@ -84,9 +86,9 @@ export async function POST(req: Request) {
       const lineTotal = +(it.qty * it.unitPrice).toFixed(2)
       const lineVat = +(lineTotal * (it.vatRate ?? 0)).toFixed(2)
       await client.query(
-        `INSERT INTO invoice_items (invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [invoiceId, it.description, it.qty, it.unitPrice, lineTotal, it.vatRate ?? 0, lineVat, it.vatExemptReason ?? null]
+        `INSERT INTO invoice_items (invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason, unit_code, vat_category)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [invoiceId, it.description, it.qty, it.unitPrice, lineTotal, it.vatRate ?? 0, lineVat, it.vatExemptReason ?? null, it.unitCode ?? null, it.vatCategory ?? null]
       )
     }
 

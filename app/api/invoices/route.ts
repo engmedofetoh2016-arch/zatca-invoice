@@ -9,7 +9,15 @@ import { buildUblInvoice, hashInvoiceXml } from "@/lib/zatca/ubl"
 import { enqueueZatcaJob } from "@/lib/zatca/queue"
 import { auditLog } from "@/lib/audit"
 
-type Item = { description: string; qty: number; unitPrice: number; vatRate: number; vatExemptReason?: string | null }
+type Item = {
+  description: string
+  qty: number
+  unitPrice: number
+  vatRate: number
+  vatExemptReason?: string | null
+  unitCode?: string | null
+  vatCategory?: string | null
+}
 
 export async function POST(req: Request) {
   if (!requireCsrf(req)) {
@@ -123,6 +131,8 @@ export async function POST(req: Request) {
         lineTotal: +(it.qty * it.unitPrice).toFixed(2),
         vatRate: it.vatRate ?? 0,
         vatAmount: +((it.qty * it.unitPrice) * (it.vatRate ?? 0)).toFixed(2),
+        unitCode: it.unitCode ?? null,
+        vatCategory: it.vatCategory ?? null,
       })),
     })
     const invoiceHash = hashInvoiceXml(ubl.xml)
@@ -170,11 +180,13 @@ export async function POST(req: Request) {
         const vatRate = Number(it.vatRate ?? 0.15)
         const vatAmount = +(lineTotal * vatRate).toFixed(2)
         const vatExemptReason = it.vatExemptReason ? String(it.vatExemptReason) : null
+        const unitCode = it.unitCode ? String(it.unitCode) : null
+        const vatCategory = it.vatCategory ? String(it.vatCategory) : null
 
         await client.query(
-          `INSERT INTO invoice_items (invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [invoiceId, description, qty, unitPrice, lineTotal, vatRate, vatAmount, vatExemptReason]
+          `INSERT INTO invoice_items (invoice_id, description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason, unit_code, vat_category)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [invoiceId, description, qty, unitPrice, lineTotal, vatRate, vatAmount, vatExemptReason, unitCode, vatCategory]
         )
       }
 

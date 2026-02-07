@@ -9,7 +9,7 @@ import { pool } from "@/lib/db"
 import { zatcaQrDataUrl } from "@/lib/zatca"
 import { getCurrentUser, getCurrentBusinessId } from "@/lib/current"
 
-function formatSarAr(amount: number) {
+function formatSar(amount: number) {
   return new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR" }).format(amount)
 }
 
@@ -39,8 +39,12 @@ export async function GET(
     if (!inv) return NextResponse.json({ error: "Invoice not found" }, { status: 404 })
 
     const itemsRes = await pool.query(
-      `SELECT description, qty, unit_price, line_total, vat_rate, vat_amount, vat_exempt_reason
-       FROM invoice_items WHERE invoice_id = $1 ORDER BY id`,
+      `SELECT ii.description, ii.qty, ii.unit_price, ii.line_total, ii.vat_rate, ii.vat_amount,
+              ii.vat_exempt_reason, ii.unit_code, ii.vat_category, u.name_ar AS unit_name_ar, u.name_en AS unit_name_en
+       FROM invoice_items ii
+       LEFT JOIN units u ON u.code = ii.unit_code
+       WHERE ii.invoice_id = $1
+       ORDER BY ii.id`,
       [id]
     )
 
@@ -64,7 +68,7 @@ export async function GET(
       console.error("QR ERROR:", e)
     }
 
-    const titleAr =
+    const title =
       inv.invoice_type === "credit"
         ? "إشعار دائن"
         : inv.invoice_type === "debit"
@@ -74,12 +78,15 @@ export async function GET(
     const itemsHtml = itemsRes.rows
       .map((it: any) => {
         const ratePct = ((Number(it.vat_rate) || 0) * 100).toFixed(0)
+        const unitLabel = it.unit_name_ar ?? it.unit_name_en ?? it.unit_code ?? "-"
         return `
           <div class="item">
             <div class="item-name">${it.description ?? "-"}</div>
-            <div class="item-total">${formatSarAr(Number(it.line_total ?? 0))}</div>
+            <div class="item-total">${formatSar(Number(it.line_total ?? 0))}</div>
             <div class="item-meta">الكمية: ${Number(it.qty ?? 0).toFixed(2)} × السعر: ${Number(it.unit_price ?? 0).toFixed(2)}</div>
-            <div class="item-meta">VAT: ${ratePct}% | ${formatSarAr(Number(it.vat_amount ?? 0))}</div>
+            <div class="item-meta">الوحدة: ${unitLabel}</div>
+            <div class="item-meta">VAT: ${ratePct}% | ${formatSar(Number(it.vat_amount ?? 0))}</div>
+            ${it.vat_category ? `<div class="item-meta">تصنيف الضريبة: ${it.vat_category}</div>` : ""}
           </div>
         `
       })
@@ -120,7 +127,7 @@ export async function GET(
     </style>
   </head>
   <body>
-    <h1>${titleAr}</h1>
+    <h1>${title}</h1>
 
     ${inv.payment_link ? `
       <div class="label">رابط الدفع</div>
@@ -132,11 +139,11 @@ export async function GET(
     <div class="label">الرقم الضريبي</div>
     <div class="value">${inv.customer_vat || "-"}</div>
 
-    <div class="section-title">تفاصيل تقنية</div>
+    <div class="section-title">الإجماليات</div>
     <div class="totals">
-      <div class="row"><span>الإجمالي قبل الضريبة</span><span>${formatSarAr(Number(inv.subtotal ?? 0))}</span></div>
-      <div class="row"><span>ضريبة القيمة المضافة</span><span>${formatSarAr(Number(inv.vat_amount ?? 0))}</span></div>
-      <div class="row"><strong>الإجمالي</strong><strong>${formatSarAr(Number(inv.total ?? 0))}</strong></div>
+      <div class="row"><span>الإجمالي قبل الضريبة</span><span>${formatSar(Number(inv.subtotal ?? 0))}</span></div>
+      <div class="row"><span>ضريبة القيمة المضافة</span><span>${formatSar(Number(inv.vat_amount ?? 0))}</span></div>
+      <div class="row"><strong>الإجمالي</strong><strong>${formatSar(Number(inv.total ?? 0))}</strong></div>
     </div>
 
     <div class="section-title">بنود الفاتورة</div>

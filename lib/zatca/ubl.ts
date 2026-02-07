@@ -27,6 +27,8 @@ export function buildUblInvoice(input: {
     lineTotal: number
     vatRate: number
     vatAmount: number
+    unitCode?: string | null
+    vatCategory?: string | null
   }>
 }) {
   // TODO(ZATCA-Phase2): Replace this minimal UBL with full UBL 2.1 structure required by ZATCA Phase 2.
@@ -37,7 +39,7 @@ export function buildUblInvoice(input: {
     return `
       <cac:InvoiceLine>
         <cbc:ID>${i + 1}</cbc:ID>
-        <cbc:InvoicedQuantity>${it.qty}</cbc:InvoicedQuantity>
+        <cbc:InvoicedQuantity${it.unitCode ? ` unitCode="${xmlEscape(it.unitCode)}"` : ""}>${it.qty}</cbc:InvoicedQuantity>
         <cbc:LineExtensionAmount>${it.lineTotal.toFixed(2)}</cbc:LineExtensionAmount>
         <cac:Item>
           <cbc:Description>${xmlEscape(it.description)}</cbc:Description>
@@ -51,6 +53,7 @@ export function buildUblInvoice(input: {
             <cbc:TaxableAmount>${it.lineTotal.toFixed(2)}</cbc:TaxableAmount>
             <cbc:TaxAmount>${it.vatAmount.toFixed(2)}</cbc:TaxAmount>
             <cac:TaxCategory>
+              ${it.vatCategory ? `<cbc:ID>${xmlEscape(it.vatCategory)}</cbc:ID>` : ""}
               <cbc:Percent>${(it.vatRate * 100).toFixed(2)}</cbc:Percent>
               <cac:TaxScheme>
                 <cbc:ID>VAT</cbc:ID>
