@@ -172,6 +172,27 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       <LinkPayment invoiceId={inv.id} currentLink={inv.payment_link ?? ""} />
 
       <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-3 text-sm">
+        <div className="text-sm font-semibold">بيانات البائع</div>
+        <div className="flex justify-between"><span className="text-gray-500">الاسم</span><span className="font-semibold">{business.name ?? "-"}</span></div>
+        <div className="flex justify-between"><span className="text-gray-500">الرقم الضريبي</span><span className="font-semibold">{business.vat_number ?? "-"}</span></div>
+        <div className="flex justify-between"><span className="text-gray-500">رقم السجل التجاري</span><span className="font-semibold">{business.cr_number ?? "-"}</span></div>
+        {(business.branch_name || business.address_line || business.city) && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">العنوان</span>
+            <span className="font-semibold">
+              {[
+                business.branch_name,
+                business.address_line,
+                business.district,
+                business.city,
+                business.postal_code,
+                business.country_code,
+              ].filter(Boolean).join("، ")}
+            </span>
+          </div>
+        )}
+        <div className="h-px bg-gray-100" />
+        <div className="text-sm font-semibold">بيانات العميل</div>
         <div className="flex justify-between"><span className="text-gray-500">العميل</span><span className="font-semibold">{inv.customer_name ?? "-"}</span></div>
         <div className="flex justify-between"><span className="text-gray-500">الرقم الضريبي</span><span className="font-semibold">{inv.customer_vat ?? "-"}</span></div>
         {inv.original_invoice_id && (

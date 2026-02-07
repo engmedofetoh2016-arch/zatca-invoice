@@ -1,4 +1,4 @@
-export const runtime = "nodejs"
+﻿export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 import path from "node:path"
@@ -11,6 +11,15 @@ import { getCurrentUser, getCurrentBusinessId } from "@/lib/current"
 
 function formatSar(amount: number) {
   return new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR" }).format(amount)
+}
+
+function vatCategoryLabel(cat?: string | null) {
+  const v = String(cat ?? "").toLowerCase()
+  if (v === "standard") return "قياسي"
+  if (v === "zero") return "صفرية"
+  if (v === "exempt") return "معفى"
+  if (v === "outofscope") return "خارج النطاق"
+  return cat ?? "-"
 }
 
 export async function GET(
@@ -28,7 +37,8 @@ export async function GET(
 
     const invRes = await pool.query(
       `
-      SELECT i.*, b.name AS seller_name, b.vat_number AS seller_vat, b.cr_number AS seller_cr
+      SELECT i.*, b.name AS seller_name, b.vat_number AS seller_vat, b.cr_number AS seller_cr,
+             b.branch_name, b.address_line, b.district, b.city, b.postal_code, b.country_code
       FROM invoices i
       JOIN businesses b ON b.id = i.business_id
       WHERE i.id = $1 AND i.business_id = $2
@@ -75,10 +85,20 @@ export async function GET(
         ? "إشعار مدين"
         : "فاتورة ضريبية"
 
+    const sellerAddress = [
+      inv.branch_name,
+      inv.address_line,
+      inv.district,
+      inv.city,
+      inv.postal_code,
+      inv.country_code,
+    ].filter(Boolean).join("، ")
+
     const itemsHtml = itemsRes.rows
       .map((it: any) => {
         const ratePct = ((Number(it.vat_rate) || 0) * 100).toFixed(0)
         const unitLabel = it.unit_name_ar ?? it.unit_name_en ?? it.unit_code ?? "-"
+        const vatCat = it.vat_category ? vatCategoryLabel(it.vat_category) : "-"
         return `
           <div class="item">
             <div class="item-name">${it.description ?? "-"}</div>
@@ -86,7 +106,8 @@ export async function GET(
             <div class="item-meta">الكمية: ${Number(it.qty ?? 0).toFixed(2)} × السعر: ${Number(it.unit_price ?? 0).toFixed(2)}</div>
             <div class="item-meta">الوحدة: ${unitLabel}</div>
             <div class="item-meta">VAT: ${ratePct}% | ${formatSar(Number(it.vat_amount ?? 0))}</div>
-            ${it.vat_category ? `<div class="item-meta">تصنيف الضريبة: ${it.vat_category}</div>` : ""}
+            ${it.vat_category ? `<div class="item-meta">تصنيف الضريبة: ${vatCat}</div>` : ""}
+            ${it.vat_exempt_reason ? `<div class="item-meta">سبب الإعفاء: ${it.vat_exempt_reason}</div>` : ""}
           </div>
         `
       })
@@ -129,12 +150,29 @@ export async function GET(
   <body>
     <h1>${title}</h1>
 
+    <div class="section-title">بيانات الفاتورة</div>
+    <div class="label">رقم الفاتورة</div>
+    <div class="value">${inv.invoice_number ?? "-"}</div>
+    <div class="label">التاريخ</div>
+    <div class="value">${new Date(inv.issue_date).toLocaleString("ar-SA")}</div>
+
     ${inv.payment_link ? `
       <div class="label">رابط الدفع</div>
       <div class="value">${inv.payment_link}</div>
     ` : ""}
 
-    <div class="section-title">العميل</div>
+    <div class="section-title">بيانات البائع</div>
+    <div class="value">${inv.seller_name || "-"}</div>
+    <div class="label">الرقم الضريبي</div>
+    <div class="value">${inv.seller_vat || "-"}</div>
+    <div class="label">رقم السجل التجاري</div>
+    <div class="value">${inv.seller_cr || "-"}</div>
+    ${sellerAddress ? `
+      <div class="label">العنوان</div>
+      <div class="value">${sellerAddress}</div>
+    ` : ""}
+
+    <div class="section-title">بيانات العميل</div>
     <div class="value">${inv.customer_name || "-"}</div>
     <div class="label">الرقم الضريبي</div>
     <div class="value">${inv.customer_vat || "-"}</div>

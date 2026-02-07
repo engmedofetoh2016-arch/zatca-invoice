@@ -65,6 +65,8 @@ export default function NewInvoicePage() {
     { description: "", qty: 1, unitPrice: 0, vatRate: 0.15, vatCategory: "standard" },
   ])
   const [loading, setLoading] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [formDetails, setFormDetails] = useState<string[]>([])
 
   const subtotal = useMemo(
     () => items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.unitPrice) || 0), 0),
@@ -144,6 +146,8 @@ export default function NewInvoicePage() {
   }
 
   async function submit(status: "issued" | "draft") {
+    setFormError(null)
+    setFormDetails([])
     setLoading(true)
     const cleanedItems = items
       .map((it) => ({
@@ -178,7 +182,12 @@ export default function NewInvoicePage() {
     })
     setLoading(false)
 
-    if (!res.ok) return alert(await res.text())
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      if (Array.isArray(data?.details)) setFormDetails(data.details)
+      setFormError(data?.error ?? "تعذر حفظ الفاتورة")
+      return
+    }
     const data = await res.json()
     router.push(`/dashboard/invoices/${data.invoiceId}`)
   }
@@ -192,6 +201,18 @@ export default function NewInvoicePage() {
       </div>
 
       <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
+        {formError && (
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            <div className="font-semibold">{formError}</div>
+            {formDetails.length > 0 && (
+              <ul className="mt-2 list-disc ps-5 text-xs text-rose-700">
+                {formDetails.map((d, idx) => (
+                  <li key={`${d}-${idx}`}>{d}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="text-xs text-gray-500">رقم الفاتورة</label>

@@ -21,7 +21,7 @@ type Item = {
 }
 
 export async function POST(req: Request) {
-  if (!requireCsrf(req)) {
+  if (!(await requireCsrf(req))) {
     return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 })
   }
 

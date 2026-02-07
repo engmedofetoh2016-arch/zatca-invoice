@@ -27,6 +27,8 @@ export default async function DashboardLayout({
               <Link href="/dashboard" className="hover:text-gray-900">الرئيسية</Link>
               <Link href="/dashboard/invoices" className="hover:text-gray-900">الفواتير</Link>
               <Link href="/dashboard/customers" className="hover:text-gray-900">العملاء</Link>
+              <Link href="/dashboard/products" className="hover:text-gray-900">المنتجات</Link>
+              <Link href="/dashboard/units" className="hover:text-gray-900">الوحدات</Link>
               <Link href="/dashboard/reports" className="hover:text-gray-900">التقارير</Link>
               <Link href="/dashboard/zatca" className="hover:text-gray-900">إعدادات ZATCA</Link>
             </nav>
