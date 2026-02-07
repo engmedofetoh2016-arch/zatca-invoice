@@ -59,6 +59,12 @@ export default async function HomePage() {
           </div>
         </div>
       </div>
+
+      <footer className="mt-12 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-500">
+        <Link className="underline" href="/terms">الشروط والأحكام</Link>
+        <Link className="underline" href="/privacy">سياسة الخصوصية</Link>
+        <Link className="underline" href="/support">الدعم الفني</Link>
+      </footer>
     </main>
   )
 }

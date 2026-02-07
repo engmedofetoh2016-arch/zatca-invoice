@@ -11,41 +11,65 @@ export async function POST(req: Request) {
   const user = token ? verifyToken(token) : null
   if (!user) return new Response("Unauthorized", { status: 401 })
 
+  const errorRedirect = (code: string) => {
+    const url = new URL("/dashboard", req.url)
+    url.searchParams.set("error", code)
+    return new Response(null, { status: 303, headers: { Location: url.toString() } })
+  }
+
   const ip = getClientIp(req)
   const rl = rateLimit(`business:update:${ip}`, 20, 60_000)
   if (!rl.ok) {
-    return new Response("Too many requests", {
-      status: 429,
-      headers: { "Retry-After": String(rl.retryAfter) },
-    })
+    return errorRedirect("rate")
   }
 
   const form = await req.formData()
   const csrfToken = String(form.get("csrf") ?? "")
   if (!(await requireCsrf(req)) && !(await requireCsrfToken(csrfToken))) {
-    return new Response("CSRF validation failed", { status: 403 })
+    return errorRedirect("csrf")
   }
 
 
-  const name = form.get("name")
-  const vat = form.get("vat")
-  const cr = form.get("cr")
+  const name = String(form.get("name") ?? "").trim()
+  const vat = String(form.get("vat") ?? "").trim()
+  const cr = String(form.get("cr") ?? "").trim()
+  const branchName = String(form.get("branch_name") ?? "").trim()
+  const addressLine = String(form.get("address_line") ?? "").trim()
+  const district = String(form.get("district") ?? "").trim()
+  const city = String(form.get("city") ?? "").trim()
+  const postalCode = String(form.get("postal_code") ?? "").trim()
+  const countryCode = String(form.get("country_code") ?? "SA").trim().toUpperCase()
 
-  if (!name || !vat || !cr) {
-    return new Response("Missing fields", { status: 400 })
+  if (!name || !vat || !cr || !branchName || !addressLine || !district || !city || !postalCode || !countryCode) {
+    return errorRedirect("missing")
+  }
+  if (!/^\d{15}$/.test(vat)) {
+    return errorRedirect("vat")
+  }
+  if (!/^\d{10}$/.test(cr)) {
+    return errorRedirect("cr")
+  }
+  if (!/^\d{5}$/.test(postalCode)) {
+    return errorRedirect("postal")
   }
 
   await pool.query(
     `
-    INSERT INTO businesses (user_id, name, vat_number, cr_number)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO businesses (user_id, name, vat_number, cr_number, branch_name, address_line, district, city, postal_code, country_code)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     ON CONFLICT (user_id)
     DO UPDATE SET
       name = EXCLUDED.name,
       vat_number = EXCLUDED.vat_number,
-      cr_number = EXCLUDED.cr_number
+      cr_number = EXCLUDED.cr_number,
+      branch_name = EXCLUDED.branch_name,
+      address_line = EXCLUDED.address_line,
+      district = EXCLUDED.district,
+      city = EXCLUDED.city,
+      postal_code = EXCLUDED.postal_code,
+      country_code = EXCLUDED.country_code
     `,
-    [user.userId, name, vat, cr]
+    [user.userId, name, vat, cr, branchName, addressLine, district, city, postalCode, countryCode]
   )
 
   const bizRes = await pool.query(

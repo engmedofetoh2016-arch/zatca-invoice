@@ -28,8 +28,9 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-5xl items-center px-6 py-12">
-      <div className="grid w-full gap-8 lg:grid-cols-2">
+    <div>
+      <div className="mx-auto flex min-h-[70vh] max-w-5xl items-center px-6 py-12">
+        <div className="grid w-full gap-8 lg:grid-cols-2">
         <div className="hidden rounded-3xl border bg-white p-8 shadow-sm lg:block">
           <div className="text-xs text-gray-500">ابدأ الآن</div>
           <h1 className="mt-2 text-2xl font-semibold">أنشئ حسابك</h1>
@@ -71,8 +72,20 @@ export default function SignupPage() {
           <button className="mt-6 w-full rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90" onClick={submit}>
             تسجيل
           </button>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between text-xs text-gray-500">
+            <a className="underline" href="/terms">الشروط والأحكام</a>
+            <a className="underline" href="/privacy">سياسة الخصوصية</a>
+            <a className="underline" href="/support">الدعم الفني</a>
+          </div>
+        </div>
         </div>
       </div>
+      <footer className="mx-auto max-w-5xl px-6 pb-8 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-500">
+        <a className="underline" href="/terms">الشروط والأحكام</a>
+        <a className="underline" href="/privacy">سياسة الخصوصية</a>
+        <a className="underline" href="/support">الدعم الفني</a>
+      </footer>
     </div>
   );
 }

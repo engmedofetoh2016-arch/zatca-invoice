@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [csrf, setCsrf] = useState("") // ✅ store it once
+  const [csrf, setCsrf] = useState("")
 
   useEffect(() => {
     setCsrf(getCsrfToken())
@@ -22,7 +22,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
 
-    const token = csrf || getCsrfToken() // ✅ fallback
+    const token = csrf || getCsrfToken()
     if (!token) {
       setError("Missing CSRF token (refresh the page).")
       return
@@ -63,7 +63,7 @@ export default function LoginPage() {
 
         <form onSubmit={onSubmit} className="rounded-3xl border bg-white p-8 shadow-sm">
           <div className="text-xs text-gray-500">تسجيل الدخول</div>
-          <h1 className="mt-2 text-2xl font-semibold">أهلاً بك</h1>
+          <h1 className="mt-2 text-2xl font-semibold">أهلا بك</h1>
           <p className="mt-2 text-sm text-gray-600">أدخل بيانات حسابك للمتابعة.</p>
 
           {error && (
@@ -92,6 +92,10 @@ export default function LoginPage() {
                 type="password"
               />
             </div>
+          </div>
+
+          <div className="mt-3 text-xs text-gray-500">
+            <a className="underline" href="/reset">نسيت كلمة المرور؟</a>
           </div>
 
           <button className="mt-6 w-full rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90">

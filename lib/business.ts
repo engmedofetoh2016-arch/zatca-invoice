@@ -3,7 +3,8 @@ import { pool } from "@/lib/db"
 export async function getBusinessByUserId(userId: string) {
   const res = await pool.query(
     `
-    SELECT b.id, b.name, b.vat_number, b.cr_number
+    SELECT b.id, b.name, b.vat_number, b.cr_number,
+           b.branch_name, b.address_line, b.district, b.city, b.postal_code, b.country_code
     FROM businesses b
     LEFT JOIN business_memberships bm ON bm.business_id = b.id
     WHERE b.user_id = $1 OR bm.user_id = $1

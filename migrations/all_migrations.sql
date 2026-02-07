@@ -309,3 +309,35 @@ CREATE INDEX IF NOT EXISTS idx_products_business_sku ON products(business_id, sk
 
 ALTER TABLE invoice_items
   ADD COLUMN IF NOT EXISTS product_id UUID NULL REFERENCES products(id) ON DELETE SET NULL;
+
+-- 016_business_profile.sql
+ALTER TABLE businesses
+  ADD COLUMN IF NOT EXISTS branch_name TEXT NULL;
+
+ALTER TABLE businesses
+  ADD COLUMN IF NOT EXISTS address_line TEXT NULL;
+
+ALTER TABLE businesses
+  ADD COLUMN IF NOT EXISTS district TEXT NULL;
+
+ALTER TABLE businesses
+  ADD COLUMN IF NOT EXISTS city TEXT NULL;
+
+ALTER TABLE businesses
+  ADD COLUMN IF NOT EXISTS postal_code TEXT NULL;
+
+ALTER TABLE businesses
+  ADD COLUMN IF NOT EXISTS country_code TEXT NULL DEFAULT 'SA';
+
+-- 017_password_reset.sql
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_token ON password_reset_tokens(token_hash);
