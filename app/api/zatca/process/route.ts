@@ -5,6 +5,7 @@ import { getActiveCertificate } from "@/lib/zatca/certificates"
 import { signXmlWithPrivateKey } from "@/lib/zatca/signing"
 import { auditLog } from "@/lib/audit"
 import { validateWithZatcaSdk } from "@/lib/zatca/sdk-client"
+import { requireCsrf } from "@/lib/security"
 
 async function callZatca(endpoint: string, payload: string, token?: string | null) {
   const res = await fetch(endpoint, {
@@ -24,7 +25,17 @@ function getZatcaEndpoint(jobType: "report" | "clear") {
   return process.env.ZATCA_CLEAR_URL ?? process.env.ZATCA_ENDPOINT_URL
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret) {
+    const headerSecret = req.headers.get("x-cron-secret") ?? ""
+    if (headerSecret !== cronSecret && !(await requireCsrf(req))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+  } else if (!(await requireCsrf(req))) {
+    return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 })
+  }
+
   const jobs = await nextPendingJobs(5)
   const endpointBase = process.env.ZATCA_ENDPOINT_URL
   const token = process.env.ZATCA_API_TOKEN

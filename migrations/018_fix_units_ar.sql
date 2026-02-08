@@ -1,6 +1,4 @@
-﻿$(Get-Content -LiteralPath "migrations\all_migrations.sql" -Raw)
-
--- 018_fix_units_ar.sql
+﻿-- 018_fix_units_ar.sql
 UPDATE units SET name_ar = 'قطعة' WHERE code = 'EA';
 UPDATE units SET name_ar = 'كيلوجرام' WHERE code = 'KG';
 UPDATE units SET name_ar = 'لتر' WHERE code = 'LTR';

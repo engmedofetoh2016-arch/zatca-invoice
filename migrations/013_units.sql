@@ -1,4 +1,4 @@
--- Units master data
+﻿-- Units master data
 CREATE TABLE IF NOT EXISTS units (
   code TEXT PRIMARY KEY,
   name_en TEXT NOT NULL,

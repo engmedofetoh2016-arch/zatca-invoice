@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { getCurrentUser } from "@/lib/current"
 import { getBusinessByUserId } from "@/lib/business"
@@ -26,7 +26,7 @@ function normalizeHeader(h: string) {
     "item description": "item_description",
     "item_desc": "item_description",
     "الكمية": "item_qty",
-    "كميه": "item_qty",
+    "كمية": "item_qty",
     "qty": "item_qty",
     "quantity": "item_qty",
     "سعر الوحدة": "item_unit_price",
@@ -59,8 +59,8 @@ function normalizeHeader(h: string) {
     "نوع_الفاتورة": "invoice_type",
     "رقم الفاتورة الأصلية": "original_invoice_id",
     "رقم_الفاتورة_الأصلية": "original_invoice_id",
-    "رقم الفاتورة الاصلية": "original_invoice_id",
-    "رقم_الفاتورة_الاصلية": "original_invoice_id",
+    "رقم الفاتورة الاصليه": "original_invoice_id",
+    "رقم_الفاتورة_الاصليه": "original_invoice_id",
     "original invoice id": "original_invoice_id",
     "original_invoice_id": "original_invoice_id",
     "سبب الإشعار": "note_reason",
@@ -177,17 +177,19 @@ export async function POST(req: Request) {
       }
 
       const computed = hasItemCols
-        ? items.map((it) => {
-            const description = String(it.item_description ?? "").trim()
-            const qty = Number(it.item_qty ?? 0)
-            const unitPrice = Number(it.item_unit_price ?? 0)
-            const vatRate = it.item_vat_rate ? Number(it.item_vat_rate) : 0.15
-            const vatExemptReason = it.item_vat_exempt_reason ? String(it.item_vat_exempt_reason).trim() : null
-            const unitCode = it.item_unit_code ? String(it.item_unit_code).trim() : null
-            const vatCategory = it.item_vat_category ? String(it.item_vat_category).trim().toLowerCase() : null
-            const lineTotal = +(qty * unitPrice).toFixed(2)
-            return { description, qty, unitPrice, vatRate, vatExemptReason, unitCode, vatCategory, lineTotal }
-          }).filter((it) => it.description && it.qty > 0)
+        ? items
+            .map((it) => {
+              const description = String(it.item_description ?? "").trim()
+              const qty = Number(it.item_qty ?? 0)
+              const unitPrice = Number(it.item_unit_price ?? 0)
+              const vatRate = it.item_vat_rate ? Number(it.item_vat_rate) : 0.15
+              const vatExemptReason = it.item_vat_exempt_reason ? String(it.item_vat_exempt_reason).trim() : null
+              const unitCode = it.item_unit_code ? String(it.item_unit_code).trim() : null
+              const vatCategory = it.item_vat_category ? String(it.item_vat_category).trim().toLowerCase() : null
+              const lineTotal = +(qty * unitPrice).toFixed(2)
+              return { description, qty, unitPrice, vatRate, vatExemptReason, unitCode, vatCategory, lineTotal }
+            })
+            .filter((it) => it.description && it.qty > 0)
         : []
 
       if (hasItemCols && computed.length === 0) continue

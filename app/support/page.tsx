@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic"
+﻿export const dynamic = "force-dynamic"
 
 export default function SupportPage() {
   return (
@@ -10,8 +10,8 @@ export default function SupportPage() {
       </div>
 
       <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-2 text-sm text-gray-700">
-        <div>البريد: support@example.com</div>
-        <div>الهاتف: 0000-000-000</div>
+        <div>البريد: engmedofetoh2016@gmail.com</div>
+        <div>الهاتف: +201507868060</div>
       </div>
     </div>
   )

@@ -1,2 +1,2 @@
-invoice_number,item_description,item_qty,item_unit_price,customer_name,customer_vat,issue_date,invoice_type,original_invoice_id,note_reason
+﻿invoice_number,item_description,item_qty,item_unit_price,customer_name,customer_vat,issue_date,invoice_type,original_invoice_id,note_reason
 INV-0001,منتج A,2,50,شركة المستقبل,111111111111111,2026-02-03,invoice,,

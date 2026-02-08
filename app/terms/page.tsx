@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic"
+﻿export const dynamic = "force-dynamic"
 
 export default function TermsPage() {
   return (
@@ -10,9 +10,16 @@ export default function TermsPage() {
       </div>
 
       <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-3 text-sm text-gray-700">
-        <p>باستخدامك للمنصة، فإنك توافق على هذه الشروط.</p>
-        <p>الخدمة مقدمة كما هي، ويجب عليك التأكد من صحة البيانات التي تدخلها.</p>
-        <p>يُمنع إساءة استخدام الخدمة أو محاولة اختراقها.</p>
+        <p>باستخدامك للمنصة فإنك توافق على هذه الشروط.</p>
+        <p>أنت مسؤول عن صحة البيانات التي تدخلها في النظام وعن حفظ سرية بيانات الدخول الخاصة بك.</p>
+        <p>يُمنع استخدام المنصة لأي نشاط غير قانوني أو إساءة استخدام قد تؤثر على توفر الخدمة.</p>
+        <p>قد نقوم بتحديث هذه الشروط من وقت لآخر، وسيتم نشر أي تحديثات على هذه الصفحة.</p>
+      </div>
+
+      <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-2 text-sm text-gray-700">
+        <div className="font-semibold">الدعم الفني</div>
+        <div>البريد: engmedofetoh2016@gmail.com</div>
+        <div>الهاتف: +201507868060</div>
       </div>
     </div>
   )
