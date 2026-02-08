@@ -12,9 +12,8 @@ export async function POST(req: Request) {
   if (!user) return new Response("Unauthorized", { status: 401 })
 
   const errorRedirect = (code: string) => {
-    const url = new URL("/dashboard", req.url)
-    url.searchParams.set("error", code)
-    return new Response(null, { status: 303, headers: { Location: url.toString() } })
+    const params = new URLSearchParams({ error: code })
+    return new Response(null, { status: 303, headers: { Location: `/dashboard?${params.toString()}` } })
   }
 
   const ip = getClientIp(req)
