@@ -32,12 +32,13 @@ export async function POST(req: Request) {
     )
   }
 
-  const isProd = process.env.NODE_ENV === "production"
-  const secure = isProd ? " Secure;" : ""
+  const proto = req.headers.get("x-forwarded-proto")
+  const isHttps = proto === "https"
+  const secure = isHttps ? " Secure;" : ""
   return new Response(JSON.stringify({ ok: true }), {
     headers: {
       "Content-Type": "application/json",
-      "Set-Cookie": `token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0;${secure}`,
+      "Set-Cookie": `token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT;${secure}`,
     },
   })
 }
